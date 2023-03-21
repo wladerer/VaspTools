@@ -11,10 +11,12 @@ def plot_bandstructure(vasprun: Vasprun, title=None, dark_mode=False, labels=Non
             labels = vasprun.kpath_labels_merged
         except FileNotFoundError:
             print('Error: No KPOINTS file found. Please provide a KPOINTS file or provide a list of labels.')
+    
     kpath = vasprun.kpath
     eigenvalues: pd.DataFrame = vasprun.eigenvalues
-    #ignore the spin
     eigenvalues = eigenvalues.drop(columns=['spin'])
+    fig = px.line(eigenvalues, x=kpath, y=eigenvalues.columns, labels={'x': 'Momentum', 'y': 'Energy (eV)'})
+    fig.update_xaxes(ticktext=labels, tickvals=kpath)
     
 
 
