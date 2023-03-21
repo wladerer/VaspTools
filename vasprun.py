@@ -1,9 +1,9 @@
 # import pathlib and io modules
 from pathlib import Path
-import io
 import sys
 import pandas as pd
 import numpy as np
+import os
 
 
 import plotly.graph_objects as go
@@ -225,8 +225,9 @@ class Vasprun:
     def kpath_labels(self) -> list:
 
         try:
-
-            return get_kpath_labels('KPOINTS')[0]
+            #append KPOINTS to self.path
+            kpoints_path = os.path.join(os.path.dirname(self.path), 'KPOINTS')
+            return get_kpath_labels(kpoints_path)[0]
 
         except FileNotFoundError:
 

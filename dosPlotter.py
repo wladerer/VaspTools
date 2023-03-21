@@ -1,7 +1,6 @@
 from vasprun import Vasprun
 import pandas as pd
 import plotly.express as px
-#use simple_white theme
 px.defaults.template = 'simple_white'
 
 
