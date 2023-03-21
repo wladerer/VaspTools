@@ -67,7 +67,7 @@ ___
 ### Plot total dos of a spin polarized calculation
 ```python
 from vasprun import Vasprun
-from plotly_plotter import plot_total_dos, plot_partial_dos
+from dosPlotter import plot_total_dos, plot_partial_dos
 
 vasprun = Vasprun("vasprun.xml")
 plot_total_dos(vasprun.dos.total, is_spin=True)
