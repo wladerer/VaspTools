@@ -245,7 +245,7 @@ class Vasprun:
         return atom_count
 
     @property
-    def unique_atoms(self) -> int:
+    def unique_atom_count(self) -> int:
         unique_atoms = int(self.root.find('atominfo').find('types').text)
 
         return unique_atoms
