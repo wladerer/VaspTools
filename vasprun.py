@@ -1,5 +1,6 @@
 # import pathlib and io modules
 from pathlib import Path
+import io
 import sys
 import pandas as pd
 import numpy as np
