@@ -88,7 +88,7 @@ plot_total_dos(vasprun.dos.total, is_spin=True)
  vasprun = Vasprun("vasprun.xml")
  vasprun.bands.plot_3d([40,42])
  ```
+![3d_band](https://user-images.githubusercontent.com/94595045/227369719-6067b58a-ee23-4840-a2c5-10cb29d97314.png)
 
- 
 
 
