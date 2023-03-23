@@ -37,15 +37,38 @@ def get_kpath_labels(path: Path) -> list:
     return kpath_labels, kpath_positions
 
 
+def funpack_varray(varray: ET.Element) -> np.ndarray:
+    """Unpacks a varray element into a numpy array"""
+    # Extract the text content of the <v> tags and split it into a list of strings
+    v_strs = varray.xpath('./v/text()')
+
+    # Convert the list of strings to a numpy array
+    v_array = np.fromiter(v_strs, dtype=np.float)
+
+    return v_array
+
+
+def funpack_rarray(rarray: ET.Element) -> np.ndarray:
+    """Unpacks an rarray element into a numpy array"""
+    r_elements = rarray.findall('r')
+    r_strings = [r.text.split() for r in r_elements]
+    r_floats = [[float(s) for s in r] for r in r_strings]
+
+    # get the original shape of the rarray
+    shape_str = rarray.attrib.get('shape')
+    shape = tuple(map(int, shape_str.split()))
+
+    # convert the list of floats into a numpy array
+    rarray_array = np.array(r_floats).reshape(shape)
+
+    return rarray_array
+
+
 def unpack_varray(varray: ET.Element) -> np.ndarray:
     """Unpacks a varray element into a numpy array"""
-    # get all v elements
     v_elements = varray.findall('v')
-    # split the text of each v element into a list of strings
     v_strings = [v.text.split() for v in v_elements]
-    # convert the list of strings into a list of floats
     v_floats = [[float(s) for s in v] for v in v_strings]
-    # convert the list of floats into a numpy array
     varray_array = np.array(v_floats)
 
     return varray_array
@@ -53,13 +76,9 @@ def unpack_varray(varray: ET.Element) -> np.ndarray:
 
 def unpack_rarray(rarray: ET.Element) -> np.ndarray:
     """Unpacks a rarray element into a numpy array"""
-    # get all v elements
     r_elements = rarray.findall('r')
-    # split the text of each v element into a list of strings
     r_strings = [r.text.split() for r in r_elements]
-    # convert the list of strings into a list of floats
     r_floats = [[float(s) for s in r] for r in r_strings]
-    # convert the list of floats into a numpy array
     rarray_array = np.array(r_floats)
 
     return rarray_array
@@ -67,8 +86,6 @@ def unpack_rarray(rarray: ET.Element) -> np.ndarray:
 
 def merge_discontinuities(labels: list[str]) -> list[str]:
     '''Merges discontinuities in a list of labels'''
-    # if label n == n+1, keep only label n
-    # if label n != n+1, keep both labels
     labels = [label for i, label in enumerate(
         labels[:-1]) if label != labels[i+1]] + [labels[-1]]
 
@@ -94,10 +111,9 @@ class Vasprun:
     def __init__(self, path: Path):
         self.path = path
         self.root = self.read_vasprun()
-        self.dos = DensityOfStates(self)
 
     def read_vasprun(self):
-        
+
         try:
             tree = ET.parse(self.path)
             root = tree.getroot()
@@ -105,12 +121,6 @@ class Vasprun:
         except ET.XMLSyntaxError:
             print('Error: Invalid XML file')
             print('Error: Check if the vasprun.xml file is complete')
-            sys.exit(1)
-
-    @property
-    def incar(self):
-        incar = self.root.find('incar')
-        return incar
 
     @property
     def initial_stucture_element(self):
@@ -177,7 +187,7 @@ class Vasprun:
     @property
     def incar(self) -> dict:
         incar_children = self.root.find('incar').getchildren()
-        incar_dict = {child.attrib['name']                      : child.text for child in incar_children}
+        incar_dict = {child.attrib['name']: child.text for child in incar_children}
         # trim leading and trailing whitespace from the values
         incar_dict = {k: v.strip() for k, v in incar_dict.items()}
 
@@ -226,7 +236,7 @@ class Vasprun:
     def kpath_labels(self) -> list:
 
         try:
-            #append KPOINTS to self.path
+            # append KPOINTS to self.path
             kpoints_path = os.path.join(os.path.dirname(self.path), 'KPOINTS')
             return get_kpath_labels(kpoints_path)[0]
 
@@ -300,15 +310,24 @@ class Vasprun:
 
         return fermi_energy
 
+    @property
+    def dos(self):
+        return DensityOfStates(self)
+
 
 class DensityOfStates:
 
     def __init__(self, vasprun: Vasprun):
-        self.dos_element = vasprun.root.find('calculation').find('dos')
-        self.total_dos_element = self.dos_element.find(
-            'total').find('array').find('set')
-        self.projected_dos_element = vasprun.root.find(
-            'calculation').find('projected')
+
+        try:
+            self.dos_element = vasprun.root.find('calculation').find('dos')
+
+            self.total_dos_element = self.dos_element.find(
+                'total').find('array').find('set')
+            self.projected_dos_element = vasprun.root.find(
+                'calculation').find('projected')
+        except AttributeError:
+            print('No DOS data found in vasprun.xml')
 
     @property
     def total(self) -> pd.DataFrame:
@@ -326,7 +345,9 @@ class DensityOfStates:
 
     @property
     def partial(self) -> pd.DataFrame:
+        '''Returns a dataframe of the projected density of states.'''
         partial_dos = pd.DataFrame()
+        total_dfs = []
         partial_dos_element = self.dos_element.find('partial').find('array')
         headers = [
             field.text.strip() for field in partial_dos_element.findall('field')]
@@ -341,18 +362,21 @@ class DensityOfStates:
                 df = pd.DataFrame(vals, columns=headers)
                 df['ion'] = ion_index
                 df['spin'] = spin_index
-                partial_dos = pd.concat([partial_dos, df])
+                total_dfs.append(df)
+
+        partial_dos = pd.concat([partial_dos, total_dfs])
 
         return partial_dos
 
     @property
     def projected(self) -> pd.DataFrame:
+        ''' This is still not functional'''
         projected_dos = pd.DataFrame()
         projected_dos_element = self.projected_dos_element.find('array')
         headers = [
             field.text.strip() for field in projected_dos_element.findall('field')]
 
-
+        total_dfs = []
         spins = projected_dos_element.find('set').findall('set')
         for spin in spins:
             # spin index is weird, it no longer has a space between the word and the number, so just take the last character
@@ -365,12 +389,226 @@ class DensityOfStates:
                 bands = kpoint.findall('set')
                 for band in bands:
                     band_index = int(band.attrib['comment'].split()[-1])
-                    vals = unpack_rarray(band)
+                    vals = funpack_rarray(band)
                     df = pd.DataFrame(vals, columns=headers)
                     df['band'] = band_index
                     df['kpoint'] = kpoint_index
                     df['spin'] = spin_index
-                    projected_dos = pd.concat([projected_dos, df])
+                    total_dfs.append(df)
+
+        projected_dos = pd.concat([projected_dos, df])
 
         return projected_dos
 
+
+class BandStructure:
+
+    def __init__(self, vasprun: Vasprun):
+        self.vasprun = vasprun
+        self.kpoint_elements = vasprun.root.xpath(
+            "calculation/projected/eigenvalues/array/set/set/set")
+        self.kpoint_values = self.get_kpoints()
+
+    def get_kpoints(self) -> pd.DataFrame:
+        '''Returns a dataframe of the kpoints and their energies, bands, positions, and occupations'''
+        kpoint_arrays = [unpack_rarray(kpoint)
+                         for kpoint in self.kpoint_elements]
+        # add an index to the array starting at 1 and going to the length of the array
+
+        kpoints = pd.DataFrame()
+
+        bands = np.arange(1, len(kpoint_arrays[0]) + 1)
+        for index, kpoint_array in enumerate(kpoint_arrays):
+
+            df = pd.DataFrame(kpoint_array, columns=['energy', 'occupation'])
+            df['kpoint'] = index + 1
+            df['band'] = bands
+            kpoints = pd.concat([kpoints, df])
+
+        return kpoints
+
+    def merge_kpoint_pos_and_values(self) -> pd.DataFrame:
+
+        # convert self.vasprun.kpoints to a dataframe with headers x y z
+        kpoint_coords = pd.DataFrame(
+            self.vasprun.kpoints, columns=['x', 'y', 'z'])
+        kpoint_coords['kpoint'] = np.arange(1, len(kpoint_coords) + 1)
+
+        # merge the two dataframes
+        kpoints = pd.merge(self.kpoint_values, kpoint_coords, on='kpoint')
+
+        return kpoints
+
+    @property
+    def kpoints(self) -> pd.DataFrame:
+        return self.merge_kpoint_pos_and_values()
+
+    def band(self, bands: int) -> pd.DataFrame:
+        return self.kpoints[self.kpoints['band'] == bands]
+
+    @property
+    def fermi_surface(self) -> list[pd.DataFrame]:
+        # get kpoints where the energy is roughly equal to the fermi energy
+
+        fermi_surface = self.kpoints[np.isclose(
+            self.kpoints['energy'], self.vasprun.fermi_energy, rtol=0.05)]
+
+        if fermi_surface.empty:
+            print('No kpoints found on the fermi surface')
+            print('Retrying at a lower tolerance')
+            fermi_surface = self.kpoints[np.isclose(
+                self.kpoints['energy'], self.vasprun.fermi_energy, rtol=0.08)]
+            if fermi_surface.empty:
+                raise ValueError('No kpoints found on the fermi surface')
+
+        # get the bands that are on the fermi surface
+        bands = fermi_surface['band'].unique()
+
+        fermi_surface_bands = []
+        for band in bands:
+            fermi_surface_bands.append(
+                fermi_surface[fermi_surface['band'] == band])
+
+        return fermi_surface_bands
+
+    def plot_3d(self, bands: list[int], title: str = None):
+        import plotly.graph_objects as go
+
+        # get the bands
+        band_indices = bands
+        bands = [self.band(band) for band in bands]
+
+        # plot the bands together
+        fig = go.Figure()
+        fermi_energy = self.vasprun.fermi_energy
+        for band in bands:
+
+            mesh = go.Mesh3d(x=2*band['x'], y=2*band['y'], z=band['energy'] -
+                             fermi_energy, intensity=band['occupation'], showscale=False)
+            fig.add_trace(mesh)
+
+        # add a legend indicating the band number
+        fig.update_scenes(xaxis_title='kx', yaxis_title='ky',
+                          zaxis_title='E - Ef (eV)')
+
+        if title == None:
+            title = f'3D Band Structure of {self.vasprun.formula} (bands {", ".join(str(band) for band in band_indices)})'
+
+        fig.update_layout(title=title, title_x=0.5)
+
+        fig.show()
+
+    def plot_1d(self, axis: str = 'x', emin: float = None, emax: float = None, bands: list[int] = None, title: str = None):
+        '''Plots the band structure along a given axis'''
+
+        kpoints = self.kpoints
+        bands = [self.kpoints[self.kpoints['band'] == band]
+                 for band in kpoints['band'].unique()]
+
+        if emin == None:
+            emin = kpoints['energy'].min()
+        if emax == None:
+            emax = kpoints['energy'].max()
+
+        # plot each band within the energy range
+        import plotly.graph_objects as go
+
+        bands = [band[band['energy'] < emax] for band in bands]
+        bands = [band[band['energy'] > emin] for band in bands]
+
+        fig = go.Figure()
+        for band in bands:
+
+            line_plot = go.Scatter(
+                x=band['x'], y=band['energy'], mode='lines', line=dict(color='black', width=1))
+
+            fig.add_trace(line_plot)
+
+        fig.show()
+
+    def plot(self, emin: float = None, emax: float = None, bands: list[int] = None, title: str = None):
+        kpath = self.vasprun.kpath
+        kpoints = self.kpoints
+        bands = [self.kpoints[self.kpoints['band'] == band]
+                 for band in kpoints['band'].unique()]
+
+        if emin == None:
+            emin = kpoints['energy'].min()
+        if emax == None:
+            emax = kpoints['energy'].max()
+
+        # plot each band within the energy range
+        import plotly.graph_objects as go
+
+        n_subplots = len(kpath) - 1
+        paths = [kpath_loc for kpath_loc in kpath]
+        path_points = []
+        for i, path in enumerate(paths):
+
+            if i == len(paths) - 1:
+                break
+
+            start = path
+            end = paths[i+1]
+            path_point = (start, end)
+            path_points.append(path_point)
+
+
+class Geometry:
+
+    def __init__(self, vasprun):
+        self.vasprun = vasprun
+        self.initial_positions = self.vasprun.initial_positions
+        self.final_positions = self.vasprun.final_positions
+        self.atoms = self.vasprun.atom_types
+        self.structure: pd.DataFrame = self.get_structure()
+        self.final_basis = self.vasprun.final_basis
+        self.formula = self.vasprun.formula
+
+    def get_structure(self) -> pd.DataFrame:
+        from periodictable import elements
+        '''Returns a dataframe with the initial and final positions of each atom'''
+        initial_positions = pd.DataFrame(
+            self.initial_positions, columns=['x_i', 'y_i', 'z_i'])
+        final_positions = pd.DataFrame(
+            self.final_positions, columns=['x', 'y', 'z'])
+        atoms = pd.DataFrame(self.atoms, columns=['atom'])
+        # radii = pd.DataFrame([elements.symbol(atom).covalent_radius for atom in atoms['atom']], columns=['radii'])
+        structure = pd.concat(
+            [atoms, initial_positions, final_positions], axis=1)
+        return structure
+
+    def plot(self, title=None):
+        import plotly.graph_objects as go
+
+        fig = go.Figure()
+
+        colors = [(51, 92, 103), (153, 168, 140), (255, 243, 176),
+                  (224, 159, 62), (158, 42, 43), (84, 11, 14)]
+        colors = [f'rgb{color}' for color in colors]
+        color_dict = {atom: color for atom, color in zip(
+            self.structure['atom'].unique(), colors)}
+
+        # scale the xyz coordinates to the size of the unit cell
+        scaled_x = self.structure['x']
+        scaled_y = self.structure['y']
+        scaled_z = self.structure['z']
+        scaled_pos = pd.DataFrame([scaled_x, scaled_y, scaled_z]).T
+        # plot a 3d scatter plot of the atoms, color coded by atom type
+
+        # create a trace for each atom type
+        for atom in self.structure['atom'].unique():
+
+            atom_positions = scaled_pos[self.structure['atom'] == atom]
+            atom_colors = [color_dict[atom]
+                           for i in range(len(atom_positions))]
+
+            trace = go.Scatter3d(x=atom_positions['x'], y=atom_positions['y'], z=atom_positions['z'], mode='markers', marker=dict(
+                size=25, color=atom_colors), name=atom)
+            fig.add_trace(trace)
+
+        # remove background grid
+        fig.update_layout(scene=dict(xaxis=dict(showbackground=False, showgrid=False, zeroline=False, showticklabels=False), yaxis=dict(
+            showbackground=False, showgrid=False, zeroline=False, showticklabels=False), zaxis=dict(showbackground=False, showgrid=False, zeroline=False, showticklabels=False)))
+
+        fig.show()
