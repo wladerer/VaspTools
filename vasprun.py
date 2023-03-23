@@ -313,6 +313,10 @@ class Vasprun:
     @property
     def dos(self):
         return DensityOfStates(self)
+    
+    @property
+    def bands(self):
+        return BandStructure(self)
 
 
 class DensityOfStates:

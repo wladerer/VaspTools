@@ -61,6 +61,15 @@ Since most attributes are returned as numpy arrays or pandas dataframes, plottin
 
 ___
 
+## BandStructure Class
+
+The BandStructure class is used to handle information pertaining to each band, the associated kpoints, and other relevant information. It is returned as the `bands` attribute of the Vasprun class.
+
+## Plotting Utilities
+
+Currently, only 3d band structure plotting is supported. You are able to plot one more multiple bands of your choosing. The pandas dataframe queries can assist in finding bands of interest to you. 2D band structures and Fermi Surfaces should be coming soon. 
+___
+
 ## Example Usage
 
 
@@ -72,5 +81,14 @@ from dosPlotter import plot_total_dos, plot_partial_dos
 vasprun = Vasprun("vasprun.xml")
 plot_total_dos(vasprun.dos.total, is_spin=True)
  ```
+
+ ### Plot a 3D band structure of the HOMO and LUMO of a noncollinear calculation
+ ```python
+ from vasprun import Vasprun
+ vasprun = Vasprun("vasprun.xml")
+ vasprun.bands.plot_3d([40,42])
+ ```
+
+ 
 
 

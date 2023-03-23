@@ -1,0 +1,7 @@
+vasprun.xml
+vasprun.py
+
+*.xml
+*.pyc
+
+
