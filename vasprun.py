@@ -381,28 +381,18 @@ class DensityOfStates:
             field.text.strip() for field in projected_dos_element.findall('field')]
 
         total_dfs = []
-        spins = projected_dos_element.find('set').findall('set')
-        for spin in spins:
-            # spin index is weird, it no longer has a space between the word and the number, so just take the last character
-            spin_index = int(spin.attrib['comment'][-1])
+        spin_elements = projected_dos_element.find('set').findall('set')
+        spins = [ spin.findall('set') for spin in spin_elements]
+        
 
-            kpoints = spin.findall('set')
-            for kpoint in kpoints:
-                kpoint_index = int(kpoint.attrib['comment'].split()[-1])
+        
 
-                bands = kpoint.findall('set')
-                for band in bands:
-                    band_index = int(band.attrib['comment'].split()[-1])
-                    vals = funpack_rarray(band)
-                    df = pd.DataFrame(vals, columns=headers)
-                    df['band'] = band_index
-                    df['kpoint'] = kpoint_index
-                    df['spin'] = spin_index
-                    total_dfs.append(df)
 
-        projected_dos = pd.concat([projected_dos, df])
+        # return pd.concat(total_dfs, ignore_index=True)
 
-        return projected_dos
+    
+
+
 
 
 class BandStructure:
@@ -556,6 +546,109 @@ class BandStructure:
             end = paths[i+1]
             path_point = (start, end)
             path_points.append(path_point)
+
+    def contour_plot(self, band = None, emin: float = None, emax: float = None, bands: list[int] = None, title: str = None):
+        '''Plots the band structure as a contour plot'''
+        kpoints = self.kpoints
+        
+        if band == None:
+
+            #get the band that is closest to the fermi energy
+            band = kpoints[np.isclose(kpoints['energy'], self.vasprun.fermi_energy, rtol=0.05)]
+            band = band[band['band'] == band['band'].max()]
+
+        else:
+            band = self.band(band)
+
+        #plot kx vs ky with energy as the color in a contour plot with contour smoothing
+        import plotly.graph_objects as go
+
+        kx = band['x']
+        ky = band['y']
+        energy = band['energy'] - self.vasprun.fermi_energy
+
+        fig = go.Figure(data=go.Contour( x=kx, y=ky, z=energy, colorscale='rdbu', contours=dict(coloring='heatmap'), line_smoothing=1.2))
+        #label kx and ky
+        fig.update_xaxes(title_text=r'$k_x$')
+        fig.update_yaxes(title_text='$k_y$')
+        #label energy
+        fig.update_layout(coloraxis_colorbar=dict(title=r'$E - E_f$ (eV)'))
+        fig.show()
+
+    def fermi_energy_heatmap(self, title: str = None):
+        '''Plots the fermi surface'''
+        kpoints = self.kpoints
+        #get bands within the energy range fermi_energy - 0.2 and fermi_energy + 0.2
+        fermi_surface = kpoints[np.isclose(kpoints['energy'], self.vasprun.fermi_energy, rtol=0.05)]
+        #plot kx vs ky with energy as the color in a contour plot with contour smoothing
+        import plotly.graph_objects as go
+
+        kx = fermi_surface['x']
+        ky = fermi_surface['y']
+        kz = fermi_surface['z']
+        energy = fermi_surface['energy'] - self.vasprun.fermi_energy
+
+        #make subplots for kx vs ky, kx vs kz, and ky vs kz
+        fig = make_subplots(rows=1, cols=3)
+
+        fig.add_trace(go.Heatmap(x=kx, y=ky, z=energy, colorscale='rdbu', showscale=True, connectgaps=True, zsmooth='best', name=r'$k_x ^ k_y$'), row=1, col=1)
+        fig.add_trace(go.Heatmap(x=kx, y=kz, z=energy, colorscale='rdbu', showscale=True, connectgaps=True, zsmooth='best', name=r'$k_x ^ k_z$'), row=1, col=2)
+        fig.add_trace(go.Heatmap(x=ky, y=kz, z=energy, colorscale='rdbu', showscale=True, connectgaps=True, zsmooth='best', name=r'$k_y ^ k_z'), row=1, col=3)
+        
+        #label kx and ky
+        fig.update_xaxes(title_text=r'$k_x$', row=1, col=1)
+        fig.update_xaxes(title_text=r'$k_x$', row=1, col=2)
+        fig.update_xaxes(title_text=r'$k_y$', row=1, col=3)
+        fig.update_yaxes(title_text=r'$k_y$', row=1, col=1)
+        fig.update_yaxes(title_text=r'$k_z$', row=1, col=2)
+        fig.update_yaxes(title_text=r'$k_z$', row=1, col=3)
+        
+        fig.update_traces(hovertemplate='Energy: %{z:.2f}\n kx: %{x:.2f}\n ky: %{y:.2f}\n kz: %{z:.2f}')
+
+        #add title to figure
+        if title == None:
+            title = f'Energy Heatmap for {self.vasprun.formula} near the Fermi Energy: {self.vasprun.fermi_energy:.2f} eV'
+        fig.update_layout(title_text=title, title_x=0.5)
+        fig.show()
+
+    def fermi_heatmap(self, title: str = None):
+        '''Plots the fermi surface'''
+        kpoints = self.kpoints
+        #get bands within the energy range fermi_energy - 0.2 and fermi_energy + 0.2
+        fermi_surface = kpoints[np.isclose(kpoints['energy'], self.vasprun.fermi_energy, rtol=0.08)]
+        #plot kx vs ky with energy as the color in a contour plot with contour smoothing
+        import plotly.graph_objects as go
+
+        kx = fermi_surface['x']
+        ky = fermi_surface['y']
+        kz = fermi_surface['z']
+        occupation = fermi_surface['occupation'] 
+
+        #make subplots for kx vs ky, kx vs kz, and ky vs kz
+        fig = make_subplots(rows=1, cols=3)
+
+        fig.add_trace(go.Heatmap(x=kx, y=ky, z=occupation, showscale=True, connectgaps=True, zsmooth='best', name=r'$k_x ^ k_y$'), row=1, col=1)
+        fig.add_trace(go.Heatmap(x=kx, y=kz, z=occupation, showscale=True, connectgaps=True, zsmooth='best', name=r'$k_x ^ k_z$'), row=1, col=2)
+        fig.add_trace(go.Heatmap(x=ky, y=kz, z=occupation, showscale=True, connectgaps=True, zsmooth='best', name=r'$k_y ^ k_z'), row=1, col=3)
+        
+        #label kx and ky
+        fig.update_xaxes(title_text=r'$k_x$', row=1, col=1)
+        fig.update_xaxes(title_text=r'$k_x$', row=1, col=2)
+        fig.update_xaxes(title_text=r'$k_y$', row=1, col=3)
+        fig.update_yaxes(title_text=r'$k_y$', row=1, col=1)
+        fig.update_yaxes(title_text=r'$k_z$', row=1, col=2)
+        fig.update_yaxes(title_text=r'$k_z$', row=1, col=3)
+        
+        fig.update_traces(hovertemplate='Occupancy: %{z:.2f}')
+
+        #add title to figure
+        if title == None:
+            title = f'Occupation Heatmap for {self.vasprun.formula} near the Fermi Energy: {self.vasprun.fermi_energy:.2f} eV'
+        fig.update_layout(title_text=title, title_x=0.5)
+        fig.show()
+
+
+
 
 
 class Geometry:

@@ -1,3 +1,4 @@
 from vasprun import Vasprun
+import numpy as np
 vasprun = Vasprun("test.xml")
-vasprun.bands.plot_3d([48, 50 ,52])
+total_dos = vasprun.dos.projected
