@@ -1,8 +1,11 @@
 vasprun.xml
-vasprun.py
+vr.pkl
+vrproj.pkl
 
 *.xml
 *.pyc
+*.pkl
 
+tests/
 
 __pycache__/

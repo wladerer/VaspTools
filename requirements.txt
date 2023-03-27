@@ -3,3 +3,6 @@ matplotlib
 pandas
 numpy
 lxml
+polars
+pyarrow
+periodictable

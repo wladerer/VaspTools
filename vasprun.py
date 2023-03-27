@@ -15,6 +15,9 @@ import plotly.express as px
 import lxml.etree as ET
 import lxml.objectify as objectify
 
+import pickle
+import polars as pl
+
 
 def get_kpath_labels(path: Path) -> list:
     """Returns a list of kpath labels from a KPOINTS file"""
@@ -49,17 +52,11 @@ def funpack_varray(varray: ET.Element) -> np.ndarray:
 
 
 def funpack_rarray(rarray: ET.Element) -> np.ndarray:
-    """Unpacks an rarray element into a numpy array"""
+    """Unpacks a rarray element into a numpy array"""
     r_elements = rarray.findall('r')
-    r_strings = [r.text.split() for r in r_elements]
-    r_floats = [[float(s) for s in r] for r in r_strings]
-
-    # get the original shape of the rarray
-    shape_str = rarray.attrib.get('shape')
-    shape = tuple(map(int, shape_str.split()))
-
-    # convert the list of floats into a numpy array
-    rarray_array = np.array(r_floats).reshape(shape)
+    r_strings = [r.text for r in r_elements]
+    r_floats = np.array([np.fromstring(s, dtype=float, sep=' ') for s in r_strings])
+    rarray_array = np.array(r_floats, dtype=float)
 
     return rarray_array
 
@@ -121,77 +118,6 @@ class Vasprun:
         except ET.XMLSyntaxError:
             print('Error: Invalid XML file')
             print('Error: Check if the vasprun.xml file is complete')
-
-    @property
-    def initial_stucture_element(self):
-        initial_pos_element = self.root.find('structure[@name="initialpos"]')
-        initial_structure_element = initial_pos_element.find('crystal')
-        return initial_structure_element
-
-    @property
-    def initial_basis(self) -> np.ndarray:
-        initial_basis_varray = self.initial_stucture_element.find(
-            'varray[@name="basis"]')
-        initial_basis = unpack_varray(initial_basis_varray)
-
-        return initial_basis
-
-    @property
-    def initial_reciprocal_basis(self) -> np.ndarray:
-        initial_reciprocal_basis_varray = self.initial_stucture_element.find(
-            'varray[@name="rec_basis"]')
-        initial_reciprocal_basis = unpack_varray(
-            initial_reciprocal_basis_varray)
-
-        return initial_reciprocal_basis
-
-    @property
-    def initial_positions(self) -> np.ndarray:
-        initial_positions_varray = self.root.find(
-            'structure[@name="initialpos"]').find('varray[@name="positions"]')
-        initial_positions = unpack_varray(initial_positions_varray)
-
-        return initial_positions
-
-    @property
-    def final_stucture_element(self):
-        final_pos_element = self.root.find('structure[@name="finalpos"]')
-        final_structure_element = final_pos_element.find('crystal')
-
-        return final_structure_element
-
-    @property
-    def final_basis(self) -> np.ndarray:
-        final_basis_varray = self.final_stucture_element.find(
-            'varray[@name="basis"]')
-        final_basis = unpack_varray(final_basis_varray)
-
-        return final_basis
-
-    @property
-    def final_reciprocal_basis(self) -> np.ndarray:
-        final_reciprocal_basis_varray = self.final_stucture_element.find(
-            'varray[@name="rec_basis"]')
-        final_reciprocal_basis = unpack_varray(final_reciprocal_basis_varray)
-
-        return final_reciprocal_basis
-
-    @property
-    def final_positions(self) -> np.ndarray:
-        final_positions_varray = self.root.find(
-            'structure[@name="finalpos"]').find('varray[@name="positions"]')
-        final_positions = unpack_varray(final_positions_varray)
-
-        return final_positions
-
-    @property
-    def incar(self) -> dict:
-        incar_children = self.root.find('incar').getchildren()
-        incar_dict = {child.attrib['name']: child.text for child in incar_children}
-        # trim leading and trailing whitespace from the values
-        incar_dict = {k: v.strip() for k, v in incar_dict.items()}
-
-        return incar_dict
 
     @property
     def kpoints(self) -> np.ndarray:
@@ -318,6 +244,10 @@ class Vasprun:
     def bands(self):
         return BandStructure(self)
 
+    @property
+    def structure(self):
+        return Structure(self)
+
 
 class DensityOfStates:
 
@@ -372,28 +302,138 @@ class DensityOfStates:
 
         return partial_dos
 
+    
     @property
     def projected(self) -> pd.DataFrame:
-        ''' This is still not functional'''
-        projected_dos = pd.DataFrame()
+        '''Returns a dataframe of the projected density of states.'''
+
         projected_dos_element = self.projected_dos_element.find('array')
-        headers = [
-            field.text.strip() for field in projected_dos_element.findall('field')]
-
-        total_dfs = []
-        spin_elements = projected_dos_element.find('set').findall('set')
-        spins = [ spin.findall('set') for spin in spin_elements]
+        headers = [field.text.strip() for field in projected_dos_element.findall('field')]
+        spins = [spin for spin in projected_dos_element.find('set').findall('set')]
+        n_spins = len(spins) 
+        kpoints = [kpoint.findall('set') for kpoint in spins]
+        n_kpoints = len(kpoints[0])  
+        band_lists = [band.findall('set') for kpoint in kpoints for band in kpoint]
+        band_arrays = [funpack_rarray(band) for band_list in band_lists for band in band_list]
+        n_bands = len(band_lists[0])
+        n_ions = len(band_arrays[0])
+        ion_indices = np.arange(1, len(band_arrays[0]) + 1)
+        spin_indices = np.arange(1, n_spins + 1) 
+        kpoint_indices = np.arange(1, n_kpoints + 1)
+        band_indices = np.arange(1, n_bands + 1)
+        dfs = [pd.DataFrame(band_array, columns=headers) for band_array in band_arrays]
+        projected_dos = pd.concat(dfs)
+       
         
+        projected_dos['ion'] = np.tile(ion_indices, n_spins * n_kpoints * n_bands)
+        projected_dos['spin'] = np.tile(np.repeat(spin_indices, n_kpoints * n_bands), n_ions)
+        projected_dos['kpoint'] = np.tile(np.repeat(kpoint_indices, n_bands), n_ions * n_spins)
+        projected_dos['band'] = np.tile(band_indices, n_ions * n_spins * n_kpoints)
 
-        
+        return projected_dos
+
+    @property
+    def cprojected(self) -> pd.DataFrame:
+        ''' Checks to see if a vrproj.pkl file exists and if so, returns the projected density of states from that file. If not, it creates the file and returns the projected density of states.'''
+
+        if os.path.isfile('vrproj.pkl') and os.path.getsize('vrproj.pkl') > 0:
+            with open('vrproj.pkl', 'rb') as f:
+                projected_dos = pickle.load(f)
+        else:
+            projected_dos = self.projected
+            with open('vrproj.pkl', 'wb') as f:
+                pickle.dump(projected_dos, f)
+
+        return projected_dos
 
 
-        # return pd.concat(total_dfs, ignore_index=True)
+class Structure:
 
+    def __init__(self, vasprun: Vasprun):
+        self.vasprun = vasprun
+        self.root = vasprun.root
     
+    @property
+    def initial_stucture_element(self):
+        initial_pos_element = self.root.find('structure[@name="initialpos"]')
+        initial_structure_element = initial_pos_element.find('crystal')
+        return initial_structure_element
 
+    @property
+    def initial_basis(self) -> np.ndarray:
+        initial_basis_varray = self.initial_stucture_element.find(
+            'varray[@name="basis"]')
+        initial_basis = unpack_varray(initial_basis_varray)
 
+        return initial_basis
 
+    @property
+    def initial_reciprocal_basis(self) -> np.ndarray:
+        initial_reciprocal_basis_varray = self.initial_stucture_element.find(
+            'varray[@name="rec_basis"]')
+        initial_reciprocal_basis = unpack_varray(
+            initial_reciprocal_basis_varray)
+
+        return initial_reciprocal_basis
+
+    @property
+    def initial_positions(self) -> np.ndarray:
+        initial_positions_varray = self.root.find(
+            'structure[@name="initialpos"]').find('varray[@name="positions"]')
+        initial_positions = unpack_varray(initial_positions_varray)
+
+        return initial_positions
+
+    @property
+    def final_stucture_element(self):
+        final_pos_element = self.root.find('structure[@name="finalpos"]')
+        final_structure_element = final_pos_element.find('crystal')
+
+        return final_structure_element
+
+    @property
+    def final_basis(self) -> np.ndarray:
+        final_basis_varray = self.final_stucture_element.find(
+            'varray[@name="basis"]')
+        final_basis = unpack_varray(final_basis_varray)
+
+        return final_basis
+
+    @property
+    def final_reciprocal_basis(self) -> np.ndarray:
+        final_reciprocal_basis_varray = self.final_stucture_element.find(
+            'varray[@name="rec_basis"]')
+        final_reciprocal_basis = unpack_varray(final_reciprocal_basis_varray)
+
+        return final_reciprocal_basis
+
+    @property
+    def final_positions(self) -> np.ndarray:
+        final_positions_varray = self.root.find(
+            'structure[@name="finalpos"]').find('varray[@name="positions"]')
+        final_positions = unpack_varray(final_positions_varray)
+
+        return final_positions
+
+    @property
+    def incar(self) -> dict:
+        incar_children = self.root.find('incar').getchildren()
+        incar_dict = {child.attrib['name']: child.text for child in incar_children}
+        # trim leading and trailing whitespace from the values
+        incar_dict = {k: v.strip() for k, v in incar_dict.items()}
+
+        return incar_dict
+
+    @property
+    def formula(self) -> str:
+        formula_dict = {atom_type: self.atom_types.count(
+            atom_type) for atom_type in self.atom_types}
+        formula = ''.join(
+            [f'{atom_type}{formula_dict[atom_type]}' for atom_type in formula_dict])
+        # remove 1s
+        formula = formula.replace('1', '')
+
+        return formula
 
 class BandStructure:
 
@@ -435,7 +475,15 @@ class BandStructure:
 
     @property
     def kpoints(self) -> pd.DataFrame:
-        return self.merge_kpoint_pos_and_values()
+        #if vr.pkl exists and is not empty, return the kpoints from that file
+
+        if os.path.isfile('vr.pkl') and os.path.getsize('vr.pkl') > 0:
+            with open('vr.pkl', 'rb') as f:
+                kpoints = pickle.load(f)
+        else:
+            kpoints = self.merge_kpoint_pos_and_values()
+
+        return kpoints
 
     def band(self, bands: int) -> pd.DataFrame:
         return self.kpoints[self.kpoints['band'] == bands]
@@ -649,20 +697,20 @@ class BandStructure:
 
 
 
-
-
 class Geometry:
 
     def __init__(self, vasprun):
         self.vasprun = vasprun
-        self.initial_positions = self.vasprun.initial_positions
-        self.final_positions = self.vasprun.final_positions
-        self.atoms = self.vasprun.atom_types
-        self.structure: pd.DataFrame = self.get_structure()
-        self.final_basis = self.vasprun.final_basis
-        self.formula = self.vasprun.formula
+        self.structure = structure
+        self.initial_positions = self.structure.initial_positions
+        self.final_positions = self.structure.final_positions
+        self.atoms = self.structure.atom_types
+        self.positions: pd.DataFrame = self.positions
+        self.final_basis = self.structure.final_basis
+        self.formula = self.structure.formula
 
-    def get_structure(self) -> pd.DataFrame:
+    @property
+    def positions(self) -> pd.DataFrame:
         from periodictable import elements
         '''Returns a dataframe with the initial and final positions of each atom'''
         initial_positions = pd.DataFrame(
@@ -709,3 +757,105 @@ class Geometry:
             showbackground=False, showgrid=False, zeroline=False, showticklabels=False), zaxis=dict(showbackground=False, showgrid=False, zeroline=False, showticklabels=False)))
 
         fig.show()
+
+
+class BsDos:
+
+    def __init__(self, vasprun):
+        self.vasprun = vasprun
+    
+    @property
+    def dataframe(self):
+        #check if the vr.pkl file exists, return the dataframe if it does. Else, use the .merge() method to create the dataframe
+        if os.path.exists('vr.pkl') and os.path.getsize('vr.pkl') > 0:
+            with open('vr.pkl', 'rb') as f:
+                df = pickle.load(f)
+                return df
+        else:
+            estruct = Estruct(self.vasprun)
+            df = estruct.merge()
+            return df
+
+                
+    def plot_3d(self, bands: list[int], title: str = None):
+        import plotly.graph_objects as go
+
+        #get the dataframe
+        df = self.dataframe
+
+        #sum all orbitals to get total density of states
+        orbital_titles = ['s', 'p', 'd', 'f', 'px', 'py', 'pz', 'dxy', 'dyz', 'dz2', 'dxz', 'x2-y2']
+        orbital_titles = [orbital for orbital in orbital_titles if orbital in df.columns]
+        df['total_dos'] = df[orbital_titles].sum(axis=1)
+        #normalize the total density of states
+        df['total_dos'] = df['total_dos']/df['total_dos'].max()
+
+        #get unique bands from the dataframe
+        unique_bands = df['band'].unique()
+        bands_indices = bands
+        bands = [ df[df['band'] == band] for  band in bands]
+
+        # plot the bands together
+        fig = go.Figure()
+        fermi_energy = self.vasprun.fermi_energy
+        for band in bands:
+
+            mesh = go.Mesh3d(x=2*band['x'], y=2*band['y'], z=band['energy'] -
+                             fermi_energy, intensity=band['total_dos'], showscale=True, cmin=df['total_dos'].min(), cmax=df['total_dos'].max(), colorbar=dict(title='DOS', titleside='right'), colorscale='inferno')
+            fig.add_trace(mesh)
+
+        # add a legend indicating the band number
+        fig.update_scenes(xaxis_title='kx', yaxis_title='ky',
+                          zaxis_title='E - Ef (eV)')
+
+        if title == None:
+            title = f'3D Band Structure of {self.vasprun.formula} (bands {", ".join(str(band) for band in bands_indices)})'
+
+        fig.update_layout(title=title, title_x=0.5)
+
+        fig.show()
+
+
+class EStruct:
+    '''Leverages both BandStructure and DensityOfStates to provide a more complete picture of the electronic structure of a material'''
+
+    def __init__(self, vasprun):
+        self.vasprun = vasprun
+        self.dos = DensityOfStates(vasprun)
+        self.bs = BandStructure(vasprun)
+
+    def merge(self) -> pd.DataFrame:
+        '''Merges the band structure and density of states dataframes'''
+
+        kpoints = self.bs.kpoints
+        dos = self.dos.cprojected
+        orbital_titles = ['s', 'p', 'd', 'f', 'px', 'py', 'pz', 'dxy', 'dyz', 'dz2', 'dxz', 'x2-y2']
+        orbital_titles = [orbital for orbital in orbital_titles if orbital in dos.columns]
+        dos = dos.drop('ion', axis=1)
+        reduced_dos = dos.groupby(['kpoint', 'band'])[orbital_titles].sum()
+        merged = pd.merge(kpoints, reduced_dos, on=['kpoint', 'band'])
+
+        return merged
+
+    def cache(self):
+        '''Caches the merged dataframe'''
+        import pickle
+        
+        #warn user that this will overwrite the cached file
+        if os.path.exists('vr.pkl'):
+            print('Warning: This will overwrite the cached file')
+
+        #merge the dataframes
+        merged = self.merge()
+
+        #save the merged dataframe as a pickle file
+        with open('vr.pkl', 'wb') as f:
+            pickle.dump(merged, f)
+
+    def load(self):
+        '''Loads the cached dataframe'''
+        import pickle
+        with open('vr.pkl', 'rb') as f:
+            merged = pickle.load(f)
+        return merged
+

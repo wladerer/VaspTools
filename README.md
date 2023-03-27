@@ -39,7 +39,8 @@ ___
 
 The DensityOfStates class is used to handle the density of states data. It is returned as the `dos` attribute of the `Vasprun` class. 
 
-Warning: The projected DOS is currently very slow to parse 
+Warning: The projected DOS is currently very slow to parse, it is recommended that you use the `cprojected` function first to create a `vrpoj.pkl` file that will be saved to the current working directory. 
+This is not the current default behavior because it is impolite to make files on someone's computer without consent.
 
 ### DensityOfStates Attributes
 | Title | Property | Type | Description | Columns |
