@@ -72,6 +72,12 @@ The BandStructure class is used to handle information pertaining to each band, t
 Conventional and 3D band structure plotting utilities are available. In addition, you may plot bands as various types of contour plots and heatmaps that are reminiscent to ARPES spectra.  
 ___
 
+
+## Symmetry Tools
+
+The `symmetry` module can assist in determining the space group symbol /international number of the system you are working with. Additionally, I have integrated pymatgen's HighSymmetryKpath to help create band structures without having to know the space group a priori. 
+___
+
 ## Example Usage
 
 
