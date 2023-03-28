@@ -102,5 +102,7 @@ plot_total_dos(vasprun.dos.total, is_spin=True)
  compare_bands(vasprun1, vasprun2, emin=-2, emax=2, labels = labels)
 ```
 
+![Band Comparison](https://user-images.githubusercontent.com/94595045/228194786-3dfe6a97-dce3-4b6e-aab2-e71605c0e578.png)
+
 
 
