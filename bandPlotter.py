@@ -216,9 +216,11 @@ vasprun8 = Vasprun('/home/wladerer/Projects/tmdPoscar_mpKpath/SOD/vasprun.xml')
 
 def make_labels(labels):
     labels = [r'$' + label + r'$' for label in labels]
-    #replace G with r'\Gamma'
-    labels = [label.replace('G', r'\Gamma') for label in labels]
-    labels = [label.replace('Gamma', r'\Gamma') for label in labels]
+    labesl = [label.replace('Gamma', r'\Gamma') for label in labels]
+
+    #replace G with \Gamma if it is not followed by an a
+    labels = [label.replace('G', r'\Gamma') if label[1] != 'a' else label for label in labels]
+
     return labels
 
 mpKpath_labels = make_labels(vasprun1.kpath_labels_merged)
@@ -230,5 +232,3 @@ compare_bands(vasprun1=vasprun1, vasprun2=vasprun2, emin=-2.0, emax=2.0, show=Tr
 compare_bands(vasprun1=vasprun3, vasprun2=vasprun4, emin=-2.0, emax=2.0, show=True, labels=tmdKpath_labels, title='tmdPoscar-tmdKpath SOC vs SOD')
 compare_bands(vasprun1=vasprun5, vasprun2=vasprun6, emin=-2.0, emax=2.0, show=True, labels=tmdKpath_labels, title='mpPoscar-tmdKpath SOC vs SOD')
 compare_bands(vasprun1=vasprun7, vasprun2=vasprun8, emin=-2.0, emax=2.0, show=True, labels=mpKpath_labels, title='tmdPoscar-mpKpath SOC vs SOD')
-
-    
