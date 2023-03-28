@@ -251,6 +251,37 @@ class Vasprun:
                 f.write(f'{kpoint[0]:12f} {kpoint[1]:12f} {kpoint[2]:12f}')
                 f.write('\n')
 
+
+    @property
+    def incar(self) -> dict:
+        incar_children = self.root.find('incar').getchildren()
+        incar_dict = {child.attrib['name']                      : child.text for child in incar_children}
+        # trim leading and trailing whitespace from the values
+        incar_dict = {k: v.strip() for k, v in incar_dict.items()}
+
+        return incar_dict
+
+
+    def write_incar(self, path: Path):
+        '''Writes an identical INCAR file for the current calculation'''
+        with open(path, 'w') as f:
+            for key, value in self.incar.items():
+                f.write(f'{key} = {value}\n')
+
+    def write_input_files(self, path: Path, incar_title: str = 'INCAR', kpoints_title: str = 'KPOINTS', poscar_title: str = 'POSCAR'):
+        '''Writes an identical POSCAR, INCAR, and KPOINTS file for the current calculation'''
+        self.structure.write_poscar(f'{path}/{poscar_title}')
+        self.write_incar(f'{path}/{incar_title}')
+        self.write_kpoints(f'{path}/{kpoints_title}')
+        
+        #get unique atom types
+        atom_dict = {atom_type: self.atom_types.count(atom_type) for atom_type in self.atom_types}
+
+        #print linux command to make potcars
+        paths = [f'$POTCAR_DIR/{atom_type}/POTCAR' for atom_type in atom_dict]
+
+        print(f'cat {" ".join(paths)} > POTCAR')
+
     @property
     def fermi_energy(self) -> float:
         fermi_energy = float(self.root.find('calculation').find(
@@ -443,15 +474,6 @@ class Structure:
         final_positions = unpack_varray(final_positions_varray)
 
         return final_positions
-
-    @property
-    def incar(self) -> dict:
-        incar_children = self.root.find('incar').getchildren()
-        incar_dict = {child.attrib['name']                      : child.text for child in incar_children}
-        # trim leading and trailing whitespace from the values
-        incar_dict = {k: v.strip() for k, v in incar_dict.items()}
-
-        return incar_dict
 
     @property
     def formula(self) -> str:
@@ -998,3 +1020,5 @@ def sort_dos_by_spin(projected: pd.DataFrame, spin: int) -> pd.DataFrame:
 
     return reduced_dos
 
+vasprun = Vasprun('tests/vasprun.xml')
+vasprun.write_input_files('.')
