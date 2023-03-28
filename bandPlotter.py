@@ -214,6 +214,7 @@ def plot_bsdos(vasprun: Vasprun, emin: float , emax: float, show=True):
 
 
 vasprun = Vasprun('tests/vasprun.xml')
+labels = vasprun.kpath_labels
 plot_bandstructure(vasprun, emin=-2, emax=2, show=True, labels=labels, legend=False)
 
 

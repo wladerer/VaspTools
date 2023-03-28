@@ -239,6 +239,18 @@ class Vasprun:
 
         return eigenvalues
 
+    def write_kpoints(self, path: Path):
+        '''Writes an identical kpoint file for the current calculation'''
+        kpoints = self.kpoints
+
+        with open(path, 'w') as f:
+            f.write('Resurrected KPOINTS file\n')
+            f.write(f'{len(kpoints)}\n')
+            f.write(f'Cartesian\n')
+            for kpoint in kpoints:
+                f.write(f'{kpoint[0]:12f} {kpoint[1]:12f} {kpoint[2]:12f}')
+                f.write('\n')
+
     @property
     def fermi_energy(self) -> float:
         fermi_energy = float(self.root.find('calculation').find(
@@ -443,14 +455,60 @@ class Structure:
 
     @property
     def formula(self) -> str:
-        formula_dict = {atom_type: self.atom_types.count(
-            atom_type) for atom_type in self.atom_types}
+        formula_dict = {atom_type: self.vasprun.atom_types.count(
+            atom_type) for atom_type in self.vasprun.atom_types}
         formula = ''.join(
             [f'{atom_type}{formula_dict[atom_type]}' for atom_type in formula_dict])
         # remove 1s
         formula = formula.replace('1', '')
 
         return formula
+
+    @property
+    def selective_dynamics(self) -> list[list[bool]]:
+        '''Returns a list of lists of booleans indicating whether the atom is fixed in that direction'''
+        selective_dynamics_element = self.root.find(
+            'structure[@name="initialpos"]').find('varray[@name="selective"]')
+        selective_dynamics = [ v.text.split() for v in selective_dynamics_element.findall('v')]
+
+        return selective_dynamics
+
+    def write_poscar(self, filename: str = 'POSCAR', final: bool = False, scale: float = 1.0):
+        '''Writes a POSCAR file with the final or initial structure'''
+        if final:
+            basis = self.final_basis
+            positions = self.final_positions
+        else:
+            basis = self.initial_basis
+            positions = self.initial_positions
+
+        with open(filename, 'w') as f:
+            f.write(f'{self.formula}')
+            f.write('\n')
+            f.write(f'{scale}')
+            f.write('\n')
+            for basis_vector in basis:
+                f.write(f'{basis_vector[0]:8f} {basis_vector[1]:8f} {basis_vector[2]:8f}')
+                f.write('\n')
+
+            atom_dict = {atom_type: self.vasprun.atom_types.count( atom_type) for atom_type in self.vasprun.atom_types}
+            atom_line = ' '.join([atom_type for atom_type in atom_dict])
+            atom_counts = [ atom_dict[atom_type] for atom_type in atom_dict] 
+            atom_counts = ' '.join([str(count) for count in atom_counts])
+
+            f.write(f'{atom_line}')
+            f.write('\n')
+            f.write(f'{atom_counts}')
+            f.write('\n')
+            f.write(f'Direct')
+            f.write('\n')
+            selective_dynamics = self.selective_dynamics
+            for atom,position in enumerate(positions):
+                selective = selective_dynamics[atom]
+                selective = ' '.join(selective)
+
+                f.write(f'{position[0]:.8f} {position[1]:.8f} {position[2]:.8f} {selective} {self.vasprun.atom_types[atom]}') 
+                f.write('\n')
 
 
 class BandStructure:
@@ -939,3 +997,4 @@ def sort_dos_by_spin(projected: pd.DataFrame, spin: int) -> pd.DataFrame:
     reduced_dos = reduced_dos.reset_index()
 
     return reduced_dos
+
