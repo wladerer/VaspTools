@@ -213,9 +213,10 @@ def plot_bsdos(vasprun: Vasprun, emin: float , emax: float, show=True):
     
 
 
-vasprun = Vasprun('tests/vasprun.xml')
-labels = vasprun.kpath_labels
-plot_bandstructure(vasprun, emin=-2, emax=2, show=True, labels=labels, legend=False)
+vasprun1 = Vasprun('vasprun1.xml')
+vasprun2 = Vasprun('vasprun2.xml')
+labels = vasprun1.kpath_labels
+compare_bands(vasprun1, vasprun2, emin=-2, emax=2)
 
 
 

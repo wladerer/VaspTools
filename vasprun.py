@@ -1020,5 +1020,3 @@ def sort_dos_by_spin(projected: pd.DataFrame, spin: int) -> pd.DataFrame:
 
     return reduced_dos
 
-vasprun = Vasprun('tests/vasprun.xml')
-vasprun.write_input_files('.')
