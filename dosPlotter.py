@@ -58,7 +58,7 @@ def plot_total_dos(vasprun: Vasprun, emin=None, emax=None, title=None, show=True
 
 def plot_partial_dos(vasprun: Vasprun, ion: int, is_lm=True, title=None, dark_mode=False):
     '''Plot the partial density of states for a given ion.'''
-
+    import plotly.express as px
     partial_dos = vasprun.dos.partial
     partial_dos = partial_dos[partial_dos['ion'] == ion]
     partial_dos['energy'] = partial_dos['energy'] - vasprun.fermi_energy

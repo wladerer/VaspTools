@@ -42,6 +42,13 @@ def get_kpath_labels(path: Path) -> list:
 
     return kpath_labels, kpath_positions
 
+def make_labels(labels):
+    '''Formats the labels for the kpath plot.'''
+    labels = [r'$' + label + r'$' for label in labels]
+    #labels = [label.replace('Gamma', r'\Gamma') for label in labels]
+    labels = [label.replace('Gamma', r'\Gamma') for label in labels]
+
+    return labels
 
 def funpack_varray(varray: ET.Element) -> np.ndarray:
     """Unpacks a varray element into a numpy array"""
