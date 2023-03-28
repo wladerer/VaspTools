@@ -90,7 +90,7 @@ def plot_bandstructure(vasprun: Vasprun, emin: float = None,  emax=None, labels=
 
     return trace
 
-def compare_bands(vasprun1: Vasprun, vasprun2: Vasprun, emin: float = -2.0, emax: float = 2.0, show: bool = True, labels: list[str] = None, title: str = None):
+def compare_bands(vasprun1: Vasprun, vasprun2: Vasprun, emin: float = -2.0, emax: float = 2.0, show: bool = True, save: bool=False, labels: list[str] = None, title: str = None, legend: bool = True):
     '''Plots two bandstructures on the same plot in different colors.'''
     bands1 = create_band_traces(vasprun1, emin, emax)
     bands2 = create_band_traces(vasprun2, emin, emax)
@@ -139,10 +139,18 @@ def compare_bands(vasprun1: Vasprun, vasprun2: Vasprun, emin: float = -2.0, emax
 
     fig.update_layout(font=dict(size=18))
 
+    if legend == False:
+        fig.update_layout(showlegend=False)
+
+    
     if title != None:
         #use latex for title
 
         fig.update_layout(title_text=r'$\text{'+title+'}$', title_font_size=18, title_x=0.5)
+
+    if save:
+        fig.write_image(title + '.png')
+
 
     if show:
         fig.show()
@@ -200,35 +208,9 @@ def plot_bsdos(vasprun: Vasprun, emin: float , emax: float, show=True):
 
     bsdos_fig.show()
     
-    
 
 
 
-vasprun1 = Vasprun('/home/wladerer/Projects/mpPoscar_mpKpath/SOC/vasprun.xml')
-vasprun2 = Vasprun('/home/wladerer/Projects/mpPoscar_mpKpath/SOD/vasprun.xml')
-vasprun3 = Vasprun('/home/wladerer/Projects/tmdPoscar_tmdKpath/SOC/vasprun.xml')
-vasprun4 = Vasprun('/home/wladerer/Projects/tmdPoscar_tmdKpath/SOD/vasprun.xml')
-vasprun5 = Vasprun('/home/wladerer/Projects/mpPoscar_tmdKpath/SOC/vasprun.xml')
-vasprun6 = Vasprun('/home/wladerer/Projects/mpPoscar_tmdKpath/SOD/vasprun.xml')
-vasprun7 = Vasprun('/home/wladerer/Projects/tmdPoscar_mpKpath/SOC/vasprun.xml')
-vasprun8 = Vasprun('/home/wladerer/Projects/tmdPoscar_mpKpath/SOD/vasprun.xml')
-# plot_bandstructure(vasprun1, emin=-2.0, emax=2.0, show=True)
-
-def make_labels(labels):
-    labels = [r'$' + label + r'$' for label in labels]
-    labesl = [label.replace('Gamma', r'\Gamma') for label in labels]
-
-    #replace G with \Gamma if it is not followed by an a
-    labels = [label.replace('G', r'\Gamma') if label[1] != 'a' else label for label in labels]
-
-    return labels
-
-mpKpath_labels = make_labels(vasprun1.kpath_labels_merged)
-tmdKpath_labels = make_labels(vasprun3.kpath_labels_merged)
 
 
 
-compare_bands(vasprun1=vasprun1, vasprun2=vasprun2, emin=-2.0, emax=2.0, show=True, labels=mpKpath_labels, title='mpPoscar-mpKpath SOC vs SOD')
-compare_bands(vasprun1=vasprun3, vasprun2=vasprun4, emin=-2.0, emax=2.0, show=True, labels=tmdKpath_labels, title='tmdPoscar-tmdKpath SOC vs SOD')
-compare_bands(vasprun1=vasprun5, vasprun2=vasprun6, emin=-2.0, emax=2.0, show=True, labels=tmdKpath_labels, title='mpPoscar-tmdKpath SOC vs SOD')
-compare_bands(vasprun1=vasprun7, vasprun2=vasprun8, emin=-2.0, emax=2.0, show=True, labels=mpKpath_labels, title='tmdPoscar-mpKpath SOC vs SOD')
