@@ -29,11 +29,14 @@ def get_kpath_labels(path: Path) -> list:
 
     # split each line into a list of strings
     kpath_info = [label.split() for label in kpath_labels_line]
+    #remove any ! characters in from the list of lists
+    kpath_info = [ [label for label in labels if label != '!'] for labels in kpath_info]
 
     kpath_info = [label for label in kpath_info if label]
     # labels are the last element of each list, the remainig elements are the kpoint coordinates
     kpath_labels = [label[-1] for label in kpath_info]
     kpath_positions = [label[:-1] for label in kpath_info]
+    
     kpath_positions = [np.array([float(p) for p in pos])
                        for pos in kpath_positions]
 
@@ -55,7 +58,8 @@ def funpack_rarray(rarray: ET.Element) -> np.ndarray:
     """Unpacks a rarray element into a numpy array"""
     r_elements = rarray.findall('r')
     r_strings = [r.text for r in r_elements]
-    r_floats = np.array([np.fromstring(s, dtype=float, sep=' ') for s in r_strings])
+    r_floats = np.array([np.fromstring(s, dtype=float, sep=' ')
+                        for s in r_strings])
     rarray_array = np.array(r_floats, dtype=float)
 
     return rarray_array
@@ -239,7 +243,7 @@ class Vasprun:
     @property
     def dos(self):
         return DensityOfStates(self)
-    
+
     @property
     def bands(self):
         return BandStructure(self)
@@ -302,33 +306,40 @@ class DensityOfStates:
 
         return partial_dos
 
-    
     @property
     def projected(self) -> pd.DataFrame:
         '''Returns a dataframe of the projected density of states.'''
 
         projected_dos_element = self.projected_dos_element.find('array')
-        headers = [field.text.strip() for field in projected_dos_element.findall('field')]
-        spins = [spin for spin in projected_dos_element.find('set').findall('set')]
-        n_spins = len(spins) 
+        headers = [field.text.strip()
+                   for field in projected_dos_element.findall('field')]
+        spins = [spin for spin in projected_dos_element.find(
+            'set').findall('set')]
+        n_spins = len(spins)
         kpoints = [kpoint.findall('set') for kpoint in spins]
-        n_kpoints = len(kpoints[0])  
-        band_lists = [band.findall('set') for kpoint in kpoints for band in kpoint]
-        band_arrays = [funpack_rarray(band) for band_list in band_lists for band in band_list]
+        n_kpoints = len(kpoints[0])
+        band_lists = [band.findall('set')
+                      for kpoint in kpoints for band in kpoint]
+        band_arrays = [funpack_rarray(
+            band) for band_list in band_lists for band in band_list]
         n_bands = len(band_lists[0])
         n_ions = len(band_arrays[0])
         ion_indices = np.arange(1, len(band_arrays[0]) + 1)
-        spin_indices = np.arange(1, n_spins + 1) 
+        spin_indices = np.arange(1, n_spins + 1)
         kpoint_indices = np.arange(1, n_kpoints + 1)
         band_indices = np.arange(1, n_bands + 1)
-        dfs = [pd.DataFrame(band_array, columns=headers) for band_array in band_arrays]
+        dfs = [pd.DataFrame(band_array, columns=headers)
+               for band_array in band_arrays]
         projected_dos = pd.concat(dfs)
-       
-        
-        projected_dos['ion'] = np.tile(ion_indices, n_spins * n_kpoints * n_bands)
-        projected_dos['spin'] = np.tile(np.repeat(spin_indices, n_kpoints * n_bands), n_ions)
-        projected_dos['kpoint'] = np.tile(np.repeat(kpoint_indices, n_bands), n_ions * n_spins)
-        projected_dos['band'] = np.tile(band_indices, n_ions * n_spins * n_kpoints)
+
+        projected_dos['ion'] = np.tile(
+            ion_indices, n_spins * n_kpoints * n_bands)
+        projected_dos['spin'] = np.tile(
+            np.repeat(spin_indices, n_kpoints * n_bands), n_ions)
+        projected_dos['kpoint'] = np.tile(
+            np.repeat(kpoint_indices, n_bands), n_ions * n_spins)
+        projected_dos['band'] = np.tile(
+            band_indices, n_ions * n_spins * n_kpoints)
 
         return projected_dos
 
@@ -352,7 +363,7 @@ class Structure:
     def __init__(self, vasprun: Vasprun):
         self.vasprun = vasprun
         self.root = vasprun.root
-    
+
     @property
     def initial_stucture_element(self):
         initial_pos_element = self.root.find('structure[@name="initialpos"]')
@@ -418,7 +429,7 @@ class Structure:
     @property
     def incar(self) -> dict:
         incar_children = self.root.find('incar').getchildren()
-        incar_dict = {child.attrib['name']: child.text for child in incar_children}
+        incar_dict = {child.attrib['name']                      : child.text for child in incar_children}
         # trim leading and trailing whitespace from the values
         incar_dict = {k: v.strip() for k, v in incar_dict.items()}
 
@@ -434,6 +445,7 @@ class Structure:
         formula = formula.replace('1', '')
 
         return formula
+
 
 class BandStructure:
 
@@ -475,7 +487,7 @@ class BandStructure:
 
     @property
     def kpoints(self) -> pd.DataFrame:
-        #if vr.pkl exists and is not empty, return the kpoints from that file
+        # if vr.pkl exists and is not empty, return the kpoints from that file
 
         if os.path.isfile('vr.pkl') and os.path.getsize('vr.pkl') > 0:
             with open('vr.pkl', 'rb') as f:
@@ -595,40 +607,43 @@ class BandStructure:
             path_point = (start, end)
             path_points.append(path_point)
 
-    def contour_plot(self, band = None, emin: float = None, emax: float = None, bands: list[int] = None, title: str = None):
+    def contour_plot(self, band=None, emin: float = None, emax: float = None, bands: list[int] = None, title: str = None):
         '''Plots the band structure as a contour plot'''
         kpoints = self.kpoints
-        
+
         if band == None:
 
-            #get the band that is closest to the fermi energy
-            band = kpoints[np.isclose(kpoints['energy'], self.vasprun.fermi_energy, rtol=0.05)]
+            # get the band that is closest to the fermi energy
+            band = kpoints[np.isclose(
+                kpoints['energy'], self.vasprun.fermi_energy, rtol=0.05)]
             band = band[band['band'] == band['band'].max()]
 
         else:
             band = self.band(band)
 
-        #plot kx vs ky with energy as the color in a contour plot with contour smoothing
+        # plot kx vs ky with energy as the color in a contour plot with contour smoothing
         import plotly.graph_objects as go
 
         kx = band['x']
         ky = band['y']
         energy = band['energy'] - self.vasprun.fermi_energy
 
-        fig = go.Figure(data=go.Contour( x=kx, y=ky, z=energy, colorscale='rdbu', contours=dict(coloring='heatmap'), line_smoothing=1.2))
-        #label kx and ky
+        fig = go.Figure(data=go.Contour(x=kx, y=ky, z=energy, colorscale='rdbu',
+                        contours=dict(coloring='heatmap'), line_smoothing=1.2))
+        # label kx and ky
         fig.update_xaxes(title_text=r'$k_x$')
         fig.update_yaxes(title_text='$k_y$')
-        #label energy
+        # label energy
         fig.update_layout(coloraxis_colorbar=dict(title=r'$E - E_f$ (eV)'))
         fig.show()
 
     def fermi_energy_heatmap(self, title: str = None):
         '''Plots the fermi surface'''
         kpoints = self.kpoints
-        #get bands within the energy range fermi_energy - 0.2 and fermi_energy + 0.2
-        fermi_surface = kpoints[np.isclose(kpoints['energy'], self.vasprun.fermi_energy, rtol=0.05)]
-        #plot kx vs ky with energy as the color in a contour plot with contour smoothing
+        # get bands within the energy range fermi_energy - 0.2 and fermi_energy + 0.2
+        fermi_surface = kpoints[np.isclose(
+            kpoints['energy'], self.vasprun.fermi_energy, rtol=0.05)]
+        # plot kx vs ky with energy as the color in a contour plot with contour smoothing
         import plotly.graph_objects as go
 
         kx = fermi_surface['x']
@@ -636,24 +651,28 @@ class BandStructure:
         kz = fermi_surface['z']
         energy = fermi_surface['energy'] - self.vasprun.fermi_energy
 
-        #make subplots for kx vs ky, kx vs kz, and ky vs kz
+        # make subplots for kx vs ky, kx vs kz, and ky vs kz
         fig = make_subplots(rows=1, cols=3)
 
-        fig.add_trace(go.Heatmap(x=kx, y=ky, z=energy, colorscale='rdbu', showscale=True, connectgaps=True, zsmooth='best', name=r'$k_x ^ k_y$'), row=1, col=1)
-        fig.add_trace(go.Heatmap(x=kx, y=kz, z=energy, colorscale='rdbu', showscale=True, connectgaps=True, zsmooth='best', name=r'$k_x ^ k_z$'), row=1, col=2)
-        fig.add_trace(go.Heatmap(x=ky, y=kz, z=energy, colorscale='rdbu', showscale=True, connectgaps=True, zsmooth='best', name=r'$k_y ^ k_z'), row=1, col=3)
-        
-        #label kx and ky
+        fig.add_trace(go.Heatmap(x=kx, y=ky, z=energy, colorscale='rdbu', showscale=True,
+                      connectgaps=True, zsmooth='best', name=r'$k_x ^ k_y$'), row=1, col=1)
+        fig.add_trace(go.Heatmap(x=kx, y=kz, z=energy, colorscale='rdbu', showscale=True,
+                      connectgaps=True, zsmooth='best', name=r'$k_x ^ k_z$'), row=1, col=2)
+        fig.add_trace(go.Heatmap(x=ky, y=kz, z=energy, colorscale='rdbu', showscale=True,
+                      connectgaps=True, zsmooth='best', name=r'$k_y ^ k_z'), row=1, col=3)
+
+        # label kx and ky
         fig.update_xaxes(title_text=r'$k_x$', row=1, col=1)
         fig.update_xaxes(title_text=r'$k_x$', row=1, col=2)
         fig.update_xaxes(title_text=r'$k_y$', row=1, col=3)
         fig.update_yaxes(title_text=r'$k_y$', row=1, col=1)
         fig.update_yaxes(title_text=r'$k_z$', row=1, col=2)
         fig.update_yaxes(title_text=r'$k_z$', row=1, col=3)
-        
-        fig.update_traces(hovertemplate='Energy: %{z:.2f}\n kx: %{x:.2f}\n ky: %{y:.2f}\n kz: %{z:.2f}')
 
-        #add title to figure
+        fig.update_traces(
+            hovertemplate='Energy: %{z:.2f}\n kx: %{x:.2f}\n ky: %{y:.2f}\n kz: %{z:.2f}')
+
+        # add title to figure
         if title == None:
             title = f'Energy Heatmap for {self.vasprun.formula} near the Fermi Energy: {self.vasprun.fermi_energy:.2f} eV'
         fig.update_layout(title_text=title, title_x=0.5)
@@ -662,46 +681,49 @@ class BandStructure:
     def fermi_heatmap(self, title: str = None):
         '''Plots the fermi surface'''
         kpoints = self.kpoints
-        #get bands within the energy range fermi_energy - 0.2 and fermi_energy + 0.2
-        fermi_surface = kpoints[np.isclose(kpoints['energy'], self.vasprun.fermi_energy, rtol=0.08)]
-        #plot kx vs ky with energy as the color in a contour plot with contour smoothing
+        # get bands within the energy range fermi_energy - 0.2 and fermi_energy + 0.2
+        fermi_surface = kpoints[np.isclose(
+            kpoints['energy'], self.vasprun.fermi_energy, rtol=0.08)]
+        # plot kx vs ky with energy as the color in a contour plot with contour smoothing
         import plotly.graph_objects as go
 
         kx = fermi_surface['x']
         ky = fermi_surface['y']
         kz = fermi_surface['z']
-        occupation = fermi_surface['occupation'] 
+        occupation = fermi_surface['occupation']
 
-        #make subplots for kx vs ky, kx vs kz, and ky vs kz
+        # make subplots for kx vs ky, kx vs kz, and ky vs kz
         fig = make_subplots(rows=1, cols=3)
 
-        fig.add_trace(go.Heatmap(x=kx, y=ky, z=occupation, showscale=True, connectgaps=True, zsmooth='best', name=r'$k_x ^ k_y$'), row=1, col=1)
-        fig.add_trace(go.Heatmap(x=kx, y=kz, z=occupation, showscale=True, connectgaps=True, zsmooth='best', name=r'$k_x ^ k_z$'), row=1, col=2)
-        fig.add_trace(go.Heatmap(x=ky, y=kz, z=occupation, showscale=True, connectgaps=True, zsmooth='best', name=r'$k_y ^ k_z'), row=1, col=3)
-        
-        #label kx and ky
+        fig.add_trace(go.Heatmap(x=kx, y=ky, z=occupation, showscale=True,
+                      connectgaps=True, zsmooth='best', name=r'$k_x ^ k_y$'), row=1, col=1)
+        fig.add_trace(go.Heatmap(x=kx, y=kz, z=occupation, showscale=True,
+                      connectgaps=True, zsmooth='best', name=r'$k_x ^ k_z$'), row=1, col=2)
+        fig.add_trace(go.Heatmap(x=ky, y=kz, z=occupation, showscale=True,
+                      connectgaps=True, zsmooth='best', name=r'$k_y ^ k_z'), row=1, col=3)
+
+        # label kx and ky
         fig.update_xaxes(title_text=r'$k_x$', row=1, col=1)
         fig.update_xaxes(title_text=r'$k_x$', row=1, col=2)
         fig.update_xaxes(title_text=r'$k_y$', row=1, col=3)
         fig.update_yaxes(title_text=r'$k_y$', row=1, col=1)
         fig.update_yaxes(title_text=r'$k_z$', row=1, col=2)
         fig.update_yaxes(title_text=r'$k_z$', row=1, col=3)
-        
+
         fig.update_traces(hovertemplate='Occupancy: %{z:.2f}')
 
-        #add title to figure
+        # add title to figure
         if title == None:
             title = f'Occupation Heatmap for {self.vasprun.formula} near the Fermi Energy: {self.vasprun.fermi_energy:.2f} eV'
         fig.update_layout(title_text=title, title_x=0.5)
         fig.show()
 
 
-
 class Geometry:
 
     def __init__(self, vasprun):
         self.vasprun = vasprun
-        self.structure = structure
+        self.structure = vasprun.structure
         self.initial_positions = self.structure.initial_positions
         self.final_positions = self.structure.final_positions
         self.atoms = self.structure.atom_types
@@ -763,37 +785,38 @@ class BsDos:
 
     def __init__(self, vasprun):
         self.vasprun = vasprun
-    
+
     @property
     def dataframe(self):
-        #check if the vr.pkl file exists, return the dataframe if it does. Else, use the .merge() method to create the dataframe
+        # check if the vr.pkl file exists, return the dataframe if it does. Else, use the .merge() method to create the dataframe
         if os.path.exists('vr.pkl') and os.path.getsize('vr.pkl') > 0:
             with open('vr.pkl', 'rb') as f:
                 df = pickle.load(f)
                 return df
         else:
-            estruct = Estruct(self.vasprun)
+            estruct = EStruct(self.vasprun)
             df = estruct.merge()
             return df
 
-                
     def plot_3d(self, bands: list[int], title: str = None):
         import plotly.graph_objects as go
 
-        #get the dataframe
+        # get the dataframe
         df = self.dataframe
 
-        #sum all orbitals to get total density of states
-        orbital_titles = ['s', 'p', 'd', 'f', 'px', 'py', 'pz', 'dxy', 'dyz', 'dz2', 'dxz', 'x2-y2']
-        orbital_titles = [orbital for orbital in orbital_titles if orbital in df.columns]
+        # sum all orbitals to get total density of states
+        orbital_titles = ['s', 'p', 'd', 'f', 'px', 'py',
+                          'pz', 'dxy', 'dyz', 'dz2', 'dxz', 'x2-y2']
+        orbital_titles = [
+            orbital for orbital in orbital_titles if orbital in df.columns]
         df['total_dos'] = df[orbital_titles].sum(axis=1)
-        #normalize the total density of states
+        # normalize the total density of states
         df['total_dos'] = df['total_dos']/df['total_dos'].max()
 
-        #get unique bands from the dataframe
+        # get unique bands from the dataframe
         unique_bands = df['band'].unique()
         bands_indices = bands
-        bands = [ df[df['band'] == band] for  band in bands]
+        bands = [df[df['band'] == band] for band in bands]
 
         # plot the bands together
         fig = go.Figure()
@@ -829,8 +852,10 @@ class EStruct:
 
         kpoints = self.bs.kpoints
         dos = self.dos.cprojected
-        orbital_titles = ['s', 'p', 'd', 'f', 'px', 'py', 'pz', 'dxy', 'dyz', 'dz2', 'dxz', 'x2-y2']
-        orbital_titles = [orbital for orbital in orbital_titles if orbital in dos.columns]
+        orbital_titles = ['s', 'p', 'd', 'f', 'px', 'py',
+                          'pz', 'dxy', 'dyz', 'dz2', 'dxz', 'x2-y2']
+        orbital_titles = [
+            orbital for orbital in orbital_titles if orbital in dos.columns]
         dos = dos.drop('ion', axis=1)
         reduced_dos = dos.groupby(['kpoint', 'band'])[orbital_titles].sum()
         merged = pd.merge(kpoints, reduced_dos, on=['kpoint', 'band'])
@@ -840,15 +865,15 @@ class EStruct:
     def cache(self):
         '''Caches the merged dataframe'''
         import pickle
-        
-        #warn user that this will overwrite the cached file
+
+        # warn user that this will overwrite the cached file
         if os.path.exists('vr.pkl'):
             print('Warning: This will overwrite the cached file')
 
-        #merge the dataframes
+        # merge the dataframes
         merged = self.merge()
 
-        #save the merged dataframe as a pickle file
+        # save the merged dataframe as a pickle file
         with open('vr.pkl', 'wb') as f:
             pickle.dump(merged, f)
 
@@ -859,3 +884,52 @@ class EStruct:
             merged = pickle.load(f)
         return merged
 
+    def plot_1dband(self):
+
+        # get the merged dataframe
+        try:
+
+            merged = self.load()
+
+        except:
+
+            merged = self.merge()
+
+        # plot the band structure
+        fig = px.line(merged, x='kpoint', y='energy', color='band', color_continuous_scale='viridis',
+                      line_group='band', hover_name='band', hover_data=['kpoint', 'energy'])
+        fig.update_layout(title=f'Band Structure of {self.vasprun.formula}',
+                          title_x=0.5, xaxis_title='kx', yaxis_title='E - Ef (eV)')
+        fig.show()
+
+
+def sort_dos_by_ion(projected: pd.DataFrame, ion: int) -> pd.DataFrame:
+    '''Processes the projected dos data into a dataframe.'''
+    # grab ion from projected dos
+    ion_dos = projected[projected['ion'] == ion]
+    # get orbital titles (anything that isnt ion kpoint spin or band)
+    orbital_titles = [orbital for orbital in ion_dos.columns if orbital not in [
+        'ion', 'kpoint', 'spin', 'band']]
+    group_by_titles = [orbital for orbital in ion_dos.columns if orbital in [
+        'kpoint', 'spin', 'band']]  # makes dataframes more extensible
+    reduced_dos = ion_dos.groupby(group_by_titles)[orbital_titles].sum()
+    # keep spin column
+    reduced_dos = reduced_dos.reset_index()
+
+    return reduced_dos
+
+
+def sort_dos_by_spin(projected: pd.DataFrame, spin: int) -> pd.DataFrame:
+    '''Processes the projected dos data into a dataframe.'''
+    # grab ion from projected dos
+    spin_dos = projected[projected['spin'] == spin]
+    # get orbital titles (anything that isnt ion kpoint spin or band)
+    orbital_titles = [orbital for orbital in spin_dos.columns if orbital not in [
+        'ion', 'kpoint', 'spin', 'band']]
+    group_by_titles = [orbital for orbital in spin_dos.columns if orbital in [
+        'ion', 'kpoint', 'spin', 'band']]  # makes dataframes more extensible
+    reduced_dos = spin_dos.groupby(group_by_titles)[orbital_titles].sum()
+    # keep the ion column
+    reduced_dos = reduced_dos.reset_index()
+
+    return reduced_dos
