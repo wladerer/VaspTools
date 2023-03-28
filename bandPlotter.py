@@ -47,7 +47,7 @@ def create_band_traces(vasprun: Vasprun, emin: float = None, emax: float = None)
     return bands
 
 
-def plot_bandstructure(vasprun: Vasprun, emin: float = None,  emax=None, labels=None, show=True) -> px.line:
+def plot_bandstructure(vasprun: Vasprun, emin: float = None,  emax=None, labels=None, show=True, legend: bool = True) -> px.line:
     '''Plot the bandstructure.'''
     bands = create_band_traces(vasprun, emin, emax)
 
@@ -84,6 +84,9 @@ def plot_bandstructure(vasprun: Vasprun, emin: float = None,  emax=None, labels=
             tickmode='array', tickvals=kpoint_tick_val, ticktext=labels, tickfont=dict(size=18)))
 
     fig.update_layout(font=dict(size=18))
+
+    if legend == False:
+        fig.update_layout(showlegend=False)
 
     if show:
         fig.show()
@@ -210,7 +213,8 @@ def plot_bsdos(vasprun: Vasprun, emin: float , emax: float, show=True):
     
 
 
-
+vasprun = Vasprun('tests/vasprun.xml')
+plot_bandstructure(vasprun, emin=-2, emax=2, show=True, labels=labels, legend=False)
 
 
 

@@ -46,7 +46,7 @@ def make_labels(labels):
     '''Formats the labels for the kpath plot.'''
     labels = [r'$' + label + r'$' for label in labels]
     #labels = [label.replace('Gamma', r'\Gamma') for label in labels]
-    labels = [label.replace('Gamma', r'\Gamma') for label in labels]
+    labels = [label.replace('GAMMA', r'\Gamma') for label in labels]
 
     return labels
 
@@ -175,17 +175,16 @@ class Vasprun:
         try:
             # append KPOINTS to self.path
             kpoints_path = os.path.join(os.path.dirname(self.path), 'KPOINTS')
-            return get_kpath_labels(kpoints_path)[0]
+            labels = get_kpath_labels(kpoints_path)[0]
+            merged_labels = merge_discontinuities(labels)
+            formatted_labels = make_labels(merged_labels)
+            
+            return formatted_labels
 
         except FileNotFoundError:
 
             return None
 
-    @property
-    def kpath_labels_merged(self) -> list:
-        merged_labels = merge_discontinuities(self.kpath_labels)
-
-        return merged_labels
 
     @property
     def atom_count(self) -> int:
