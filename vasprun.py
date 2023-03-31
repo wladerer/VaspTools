@@ -624,15 +624,20 @@ class BandStructure:
         for band in bands:
 
             mesh = go.Mesh3d(x=2*band['x'], y=2*band['y'], z=band['energy'] -
-                             fermi_energy, intensity=band['occupation'], showscale=False)
+                             fermi_energy, showscale=False)
             fig.add_trace(mesh)
 
         # add a legend indicating the band number
         fig.update_scenes(xaxis_title='kx', yaxis_title='ky',
                           zaxis_title='E - Ef (eV)')
 
+
         if title == None:
             title = f'3D Band Structure of {self.vasprun.formula} (bands {", ".join(str(band) for band in band_indices)})'
+
+        #update the color of the traces 
+        for i in range(len(bands)):
+            fig.data[i].update(colorscale='Viridis', showscale=False)
 
         fig.update_layout(title=title, title_x=0.5)
 
@@ -1019,4 +1024,5 @@ def sort_dos_by_spin(projected: pd.DataFrame, spin: int) -> pd.DataFrame:
     reduced_dos = reduced_dos.reset_index()
 
     return reduced_dos
+
 
