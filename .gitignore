@@ -9,3 +9,4 @@ vrproj.pkl
 tests/
 
 __pycache__/
+profile.*

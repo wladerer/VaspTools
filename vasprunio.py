@@ -43,4 +43,3 @@ def unpack_rarray(rarray: ET.Element) -> np.ndarray:
 
     return rarray_array
 
-
