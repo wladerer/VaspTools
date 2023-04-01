@@ -23,14 +23,15 @@ def read_vasprun(xml_file_path: str | Path):
 
 
 def unpack_varray(varray: ET.Element) -> np.ndarray:
-    """Unpacks a varray element into a numpy array"""
-    # Extract the text content of the <v> tags and split it into a list of strings
-    v_strs = varray.xpath('./v/text()')
+    """Unpacks a rarray element into a numpy array"""
+    v_elements = varray.findall('v')
+    v_strings = [r.text for r in v_elements]
+    v_floats = np.array([np.fromstring(s, dtype=float, sep=' ')
+                        for s in v_strings])
+    varray_array = np.array(v_floats, dtype=float)
 
-    # Convert the list of strings to a numpy array
-    v_array = np.fromiter(v_strs, dtype=np.float)
+    return varray_array
 
-    return v_array
 
 def unpack_rarray(rarray: ET.Element) -> np.ndarray:
     """Unpacks a rarray element into a numpy array"""

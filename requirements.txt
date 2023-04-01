@@ -6,3 +6,4 @@ lxml
 polars
 pyarrow
 periodictable
+pymatgen

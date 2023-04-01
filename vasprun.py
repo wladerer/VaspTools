@@ -3,56 +3,12 @@ import pandas as pd
 import numpy as np
 import os
 
-from vasprunio import read_vasprun
+from vasprunio import read_vasprun, unpack_varray
 
 from plotly.subplots import make_subplots
 import plotly.express as px
 
-# import lxml utilities
-import lxml.etree as ET
-
 import pickle
-
-
-import numpy as np
-
-def get_kpath_labels(path: Path) -> list:
-    '''Returns a list of kpath labels from a KPOINTS file'''
-    with open(path, 'r') as f:
-        lines = f.readlines()
-
-    kpath_info = [[label for label in line.split() if label != '!'] for line in lines[4:] if line.strip()]
-
-    kpath_labels = [label[-1] for label in kpath_info]
-    kpath_positions = [np.array([float(p) for p in label[:-1]]) for label in kpath_info]
-
-    return kpath_labels, kpath_positions
-
-def merge_discontinuities(labels: list[str]) -> list[str]:
-    '''Merges discontinuities in a list of labels'''
-    labels = [label for i, label in enumerate(
-        labels[:-1]) if label != labels[i+1]] + [labels[-1]]
-
-    merged_labels = []
-
-    for i, label in enumerate(labels):
-        # short circuit evaluation
-        if (i != len(labels) - 1) and label[0] == labels[i+1][0]:
-            merged_labels.append(label + '|' + labels[i+1])
-            # remove the label n+1
-            labels.pop(i+1)
-        else:
-            merged_labels.append(label)
-
-    return merged_labels
-
-def make_labels(labels):
-    '''Formats the labels for the kpath plot.'''
-    labels = [r'$' + label + r'$' for label in labels]
-    #labels = [label.replace('Gamma', r'\Gamma') for label in labels]
-    labels = [label.replace('GAMMA', r'\Gamma') for label in labels]
-
-    return labels
 
 
 
@@ -62,93 +18,6 @@ class Vasprun:
         self.path = path
         self.root = read_vasprun(path)
 
-
-    @property
-    def kpoints(self) -> np.ndarray:
-        kpoints_varray = self.root.find('kpoints').find(
-            'varray[@name="kpointlist"]')
-        kpoints = unpack_varray(kpoints_varray)
-
-        return kpoints
-
-    @property
-    def kpoint_weights(self) -> np.ndarray:
-        kpoint_weights_varray = self.root.find(
-            'kpoints').find('varray[@name="weights"]')
-        kpoint_weights = unpack_varray(kpoint_weights_varray)
-
-        return kpoint_weights
-
-    @property
-    def kpoint_grid_type(self) -> str:
-        kpoint_grid_type = self.root.find(
-            'kpoints').find('generation').attrib['param']
-
-        return kpoint_grid_type
-
-    @property
-    def kpoint_linemode_divisions(self) -> int:
-        kpoint_linemode_divisions = self.root.find(
-            'kpoints').find('generation').find('i')
-        kpoint_linemode_divisions = int(kpoint_linemode_divisions.text)
-
-        return kpoint_linemode_divisions
-
-    @property
-    def kpath(self) -> np.ndarray:
-        kpath_vlist = self.root.find('kpoints').find('generation').findall('v')
-        kpath = np.array([np.array([float(s) for s in v.text.split()])
-                         for v in kpath_vlist])
-
-        return kpath
-
-    @property
-    def kpath_labels(self) -> list:
-
-        try:
-            # append KPOINTS to self.path
-            kpoints_path = os.path.join(os.path.dirname(self.path), 'KPOINTS')
-            labels = get_kpath_labels(kpoints_path)[0]
-            merged_labels = merge_discontinuities(labels)
-            formatted_labels = make_labels(merged_labels)
-            
-            return formatted_labels
-
-        except FileNotFoundError:
-
-            return None
-
-
-    @property
-    def atom_count(self) -> int:
-        atom_count = int(self.root.find('atominfo').find('atoms').text)
-
-        return atom_count
-
-    @property
-    def unique_atom_count(self) -> int:
-        unique_atoms = int(self.root.find('atominfo').find('types').text)
-
-        return unique_atoms
-
-    @property
-    def atom_types(self) -> list:
-        atom_types = self.root.find('atominfo').find(
-            'array[@name="atoms"]').find('set').findall('rc')
-        atom_types = [atom_type.find('c').text for atom_type in atom_types]
-
-        return atom_types
-
-    @property
-    def formula(self) -> str:
-        formula_dict = {atom_type: self.atom_types.count(
-            atom_type) for atom_type in self.atom_types}
-        formula = ''.join(
-            [f'{atom_type}{formula_dict[atom_type]}' for atom_type in formula_dict])
-        # remove 1s
-        formula = formula.replace('1', '')
-
-        return formula
 
     @property
     def eigenvalues(self) -> pd.DataFrame:
@@ -172,39 +41,6 @@ class Vasprun:
 
         return eigenvalues
 
-    def write_kpoints(self, path: Path):
-        '''Writes an identical kpoint file for the current calculation'''
-        kpoints = self.kpoints
-
-        with open(path, 'w') as f:
-            f.write('Resurrected KPOINTS file\n')
-            f.write(f'{len(kpoints)}\n')
-            f.write(f'Cartesian\n')
-            for kpoint in kpoints:
-                f.write(f'{kpoint[0]:12f} {kpoint[1]:12f} {kpoint[2]:12f}')
-                f.write('\n')
-
-
-    def write_input_files(self, path: Path, incar_title: str = 'INCAR', kpoints_title: str = 'KPOINTS', poscar_title: str = 'POSCAR'):
-        '''Writes an identical POSCAR, INCAR, and KPOINTS file for the current calculation'''
-        self.structure.write_poscar(f'{path}/{poscar_title}')
-        self.write_incar(f'{path}/{incar_title}')
-        self.write_kpoints(f'{path}/{kpoints_title}')
-        
-        #get unique atom types
-        atom_dict = {atom_type: self.atom_types.count(atom_type) for atom_type in self.atom_types}
-
-        #print linux command to make potcars
-        paths = [f'$POTCAR_DIR/{atom_type}/POTCAR' for atom_type in atom_dict]
-
-        print(f'cat {" ".join(paths)} > POTCAR')
-
-    @property
-    def fermi_energy(self) -> float:
-        fermi_energy = float(self.root.find('calculation').find(
-            'dos').find('i[@name="efermi"]').text)
-
-        return fermi_energy
 
     @property
     def dos(self):
