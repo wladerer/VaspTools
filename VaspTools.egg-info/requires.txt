@@ -1,0 +1,6 @@
+lxml
+pandas
+polars
+numpy
+matplotlib
+pymatgen

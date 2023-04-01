@@ -9,7 +9,6 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.pyplot as plt
 
 
-
 def pmg_structure(vasprun: Vasprun):
     '''Returns pymatgen structure object'''
     lattice = vasprun.structure.final_basis

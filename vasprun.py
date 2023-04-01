@@ -1,105 +1,38 @@
-# import pathlib and io modules
 from pathlib import Path
-import io
-import sys
 import pandas as pd
 import numpy as np
 import os
 
+from vasprunio import read_vasprun
 
-import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
 
 # import lxml utilities
 import lxml.etree as ET
-import lxml.objectify as objectify
 
 import pickle
-import polars as pl
 
+
+import numpy as np
 
 def get_kpath_labels(path: Path) -> list:
-    """Returns a list of kpath labels from a KPOINTS file"""
+    '''Returns a list of kpath labels from a KPOINTS file'''
     with open(path, 'r') as f:
         lines = f.readlines()
 
-    # get the line that contains the kpath labels
-    kpath_labels_line = lines[4:]
+    kpath_info = [[label for label in line.split() if label != '!'] for line in lines[4:] if line.strip()]
 
-    # split each line into a list of strings
-    kpath_info = [label.split() for label in kpath_labels_line]
-    #remove any ! characters in from the list of lists
-    kpath_info = [ [label for label in labels if label != '!'] for labels in kpath_info]
-
-    kpath_info = [label for label in kpath_info if label]
-    # labels are the last element of each list, the remainig elements are the kpoint coordinates
     kpath_labels = [label[-1] for label in kpath_info]
-    kpath_positions = [label[:-1] for label in kpath_info]
-    
-    kpath_positions = [np.array([float(p) for p in pos])
-                       for pos in kpath_positions]
+    kpath_positions = [np.array([float(p) for p in label[:-1]]) for label in kpath_info]
 
     return kpath_labels, kpath_positions
-
-def make_labels(labels):
-    '''Formats the labels for the kpath plot.'''
-    labels = [r'$' + label + r'$' for label in labels]
-    #labels = [label.replace('Gamma', r'\Gamma') for label in labels]
-    labels = [label.replace('GAMMA', r'\Gamma') for label in labels]
-
-    return labels
-
-def funpack_varray(varray: ET.Element) -> np.ndarray:
-    """Unpacks a varray element into a numpy array"""
-    # Extract the text content of the <v> tags and split it into a list of strings
-    v_strs = varray.xpath('./v/text()')
-
-    # Convert the list of strings to a numpy array
-    v_array = np.fromiter(v_strs, dtype=np.float)
-
-    return v_array
-
-
-def funpack_rarray(rarray: ET.Element) -> np.ndarray:
-    """Unpacks a rarray element into a numpy array"""
-    r_elements = rarray.findall('r')
-    r_strings = [r.text for r in r_elements]
-    r_floats = np.array([np.fromstring(s, dtype=float, sep=' ')
-                        for s in r_strings])
-    rarray_array = np.array(r_floats, dtype=float)
-
-    return rarray_array
-
-
-def unpack_varray(varray: ET.Element) -> np.ndarray:
-    """Unpacks a varray element into a numpy array"""
-    v_elements = varray.findall('v')
-    v_strings = [v.text.split() for v in v_elements]
-    v_floats = [[float(s) for s in v] for v in v_strings]
-    varray_array = np.array(v_floats)
-
-    return varray_array
-
-
-def unpack_rarray(rarray: ET.Element) -> np.ndarray:
-    """Unpacks a rarray element into a numpy array"""
-    r_elements = rarray.findall('r')
-    r_strings = [r.text.split() for r in r_elements]
-    r_floats = [[float(s) for s in r] for r in r_strings]
-    rarray_array = np.array(r_floats)
-
-    return rarray_array
-
 
 def merge_discontinuities(labels: list[str]) -> list[str]:
     '''Merges discontinuities in a list of labels'''
     labels = [label for i, label in enumerate(
         labels[:-1]) if label != labels[i+1]] + [labels[-1]]
 
-    # if the label n starts with the same substring the same as the label n+1, then the label n+1 is a discontinuity
-    # and should be merged with the label n using the character '|' (e.g 'S_0|S_2')
-    # dont keep the label n+1
     merged_labels = []
 
     for i, label in enumerate(labels):
@@ -113,22 +46,22 @@ def merge_discontinuities(labels: list[str]) -> list[str]:
 
     return merged_labels
 
+def make_labels(labels):
+    '''Formats the labels for the kpath plot.'''
+    labels = [r'$' + label + r'$' for label in labels]
+    #labels = [label.replace('Gamma', r'\Gamma') for label in labels]
+    labels = [label.replace('GAMMA', r'\Gamma') for label in labels]
+
+    return labels
+
+
 
 class Vasprun:
 
     def __init__(self, path: Path):
         self.path = path
-        self.root = self.read_vasprun()
+        self.root = read_vasprun(path)
 
-    def read_vasprun(self):
-
-        try:
-            tree = ET.parse(self.path)
-            root = tree.getroot()
-            return root
-        except ET.XMLSyntaxError:
-            print('Error: Invalid XML file')
-            print('Error: Check if the vasprun.xml file is complete')
 
     @property
     def kpoints(self) -> np.ndarray:
@@ -252,22 +185,6 @@ class Vasprun:
                 f.write('\n')
 
 
-    @property
-    def incar(self) -> dict:
-        incar_children = self.root.find('incar').getchildren()
-        incar_dict = {child.attrib['name']                      : child.text for child in incar_children}
-        # trim leading and trailing whitespace from the values
-        incar_dict = {k: v.strip() for k, v in incar_dict.items()}
-
-        return incar_dict
-
-
-    def write_incar(self, path: Path):
-        '''Writes an identical INCAR file for the current calculation'''
-        with open(path, 'w') as f:
-            for key, value in self.incar.items():
-                f.write(f'{key} = {value}\n')
-
     def write_input_files(self, path: Path, incar_title: str = 'INCAR', kpoints_title: str = 'KPOINTS', poscar_title: str = 'POSCAR'):
         '''Writes an identical POSCAR, INCAR, and KPOINTS file for the current calculation'''
         self.structure.write_poscar(f'{path}/{poscar_title}')
@@ -369,7 +286,7 @@ class DensityOfStates:
         n_kpoints = len(kpoints[0])
         band_lists = [band.findall('set')
                       for kpoint in kpoints for band in kpoint]
-        band_arrays = [funpack_rarray(
+        band_arrays = [unpack_rarray(
             band) for band_list in band_lists for band in band_list]
         n_bands = len(band_lists[0])
         n_ions = len(band_arrays[0])
@@ -405,132 +322,6 @@ class DensityOfStates:
                 pickle.dump(projected_dos, f)
 
         return projected_dos
-
-
-class Structure:
-
-    def __init__(self, vasprun: Vasprun):
-        self.vasprun = vasprun
-        self.root = vasprun.root
-
-    @property
-    def initial_stucture_element(self):
-        initial_pos_element = self.root.find('structure[@name="initialpos"]')
-        initial_structure_element = initial_pos_element.find('crystal')
-        return initial_structure_element
-
-    @property
-    def initial_basis(self) -> np.ndarray:
-        initial_basis_varray = self.initial_stucture_element.find(
-            'varray[@name="basis"]')
-        initial_basis = unpack_varray(initial_basis_varray)
-
-        return initial_basis
-
-    @property
-    def initial_reciprocal_basis(self) -> np.ndarray:
-        initial_reciprocal_basis_varray = self.initial_stucture_element.find(
-            'varray[@name="rec_basis"]')
-        initial_reciprocal_basis = unpack_varray(
-            initial_reciprocal_basis_varray)
-
-        return initial_reciprocal_basis
-
-    @property
-    def initial_positions(self) -> np.ndarray:
-        initial_positions_varray = self.root.find(
-            'structure[@name="initialpos"]').find('varray[@name="positions"]')
-        initial_positions = unpack_varray(initial_positions_varray)
-
-        return initial_positions
-
-    @property
-    def final_stucture_element(self):
-        final_pos_element = self.root.find('structure[@name="finalpos"]')
-        final_structure_element = final_pos_element.find('crystal')
-
-        return final_structure_element
-
-    @property
-    def final_basis(self) -> np.ndarray:
-        final_basis_varray = self.final_stucture_element.find(
-            'varray[@name="basis"]')
-        final_basis = unpack_varray(final_basis_varray)
-
-        return final_basis
-
-    @property
-    def final_reciprocal_basis(self) -> np.ndarray:
-        final_reciprocal_basis_varray = self.final_stucture_element.find(
-            'varray[@name="rec_basis"]')
-        final_reciprocal_basis = unpack_varray(final_reciprocal_basis_varray)
-
-        return final_reciprocal_basis
-
-    @property
-    def final_positions(self) -> np.ndarray:
-        final_positions_varray = self.root.find(
-            'structure[@name="finalpos"]').find('varray[@name="positions"]')
-        final_positions = unpack_varray(final_positions_varray)
-
-        return final_positions
-
-    @property
-    def formula(self) -> str:
-        formula_dict = {atom_type: self.vasprun.atom_types.count(
-            atom_type) for atom_type in self.vasprun.atom_types}
-        formula = ''.join(
-            [f'{atom_type}{formula_dict[atom_type]}' for atom_type in formula_dict])
-        # remove 1s
-        formula = formula.replace('1', '')
-
-        return formula
-
-    @property
-    def selective_dynamics(self) -> list[list[bool]]:
-        '''Returns a list of lists of booleans indicating whether the atom is fixed in that direction'''
-        selective_dynamics_element = self.root.find(
-            'structure[@name="initialpos"]').find('varray[@name="selective"]')
-        selective_dynamics = [ v.text.split() for v in selective_dynamics_element.findall('v')]
-
-        return selective_dynamics
-
-    def write_poscar(self, filename: str = 'POSCAR', final: bool = False, scale: float = 1.0):
-        '''Writes a POSCAR file with the final or initial structure'''
-        if final:
-            basis = self.final_basis
-            positions = self.final_positions
-        else:
-            basis = self.initial_basis
-            positions = self.initial_positions
-
-        with open(filename, 'w') as f:
-            f.write(f'{self.formula}')
-            f.write('\n')
-            f.write(f'{scale}')
-            f.write('\n')
-            for basis_vector in basis:
-                f.write(f'{basis_vector[0]:8f} {basis_vector[1]:8f} {basis_vector[2]:8f}')
-                f.write('\n')
-
-            atom_dict = {atom_type: self.vasprun.atom_types.count( atom_type) for atom_type in self.vasprun.atom_types}
-            atom_line = ' '.join([atom_type for atom_type in atom_dict])
-            atom_counts = [ atom_dict[atom_type] for atom_type in atom_dict] 
-            atom_counts = ' '.join([str(count) for count in atom_counts])
-
-            f.write(f'{atom_line}')
-            f.write('\n')
-            f.write(f'{atom_counts}')
-            f.write('\n')
-            f.write(f'Direct')
-            f.write('\n')
-            selective_dynamics = self.selective_dynamics
-            for atom,position in enumerate(positions):
-                selective = selective_dynamics[atom]
-                selective = ' '.join(selective)
-
-                f.write(f'{position[0]:.8f} {position[1]:.8f} {position[2]:.8f} {selective} {self.vasprun.atom_types[atom]}') 
-                f.write('\n')
 
 
 class BandStructure:
