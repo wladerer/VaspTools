@@ -10,6 +10,8 @@ import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.pyplot as plt
 
+import plotly.graph_objects as go
+
 
 class Structure:
 
@@ -37,6 +39,8 @@ class Structure:
         atom_types = self.root.find('atominfo').find(
             'array[@name="atoms"]').find('set').findall('rc')
         atom_types = [atom_type.find('c').text for atom_type in atom_types]
+        #remove whitespace
+        atom_types = [atom_type.strip() for atom_type in atom_types]
 
         return atom_types
 
@@ -170,7 +174,25 @@ class Structure:
         df['dz'] = df['fz'] - df['iz']
 
         return df 
+    
+    def plot(self, is_final: bool = True):
+        '''Creates a 3D plot of the structure using plotly'''
+        positions = self.final_positions if is_final else self.initial_positions
+        fig = go.Figure(data=[go.Scatter3d(x=positions[:,0], y=positions[:,1], z=positions[:,2], mode='markers', marker=dict(size=10))])
+        
+        from plotly_helpers import remove_background_and_axes, add_3d_xyz_vectors
+        remove_background_and_axes(fig)
+        add_3d_xyz_vectors(fig)
 
+        fig.show()
+
+    def as_dict(self, is_final: bool = True) -> dict:
+        '''Returns a dictionary of the structure'''
+        positions = self.final_positions if is_final else self.initial_positions
+        return {'basis': self.final_basis.tolist(), 'positions': positions.tolist(), 'atom_types': self.atom_types}
+
+
+        
 
 def pmg_structure(structure: Structure) -> pmgStructure:
     '''Returns pymatgen structure object'''
@@ -258,3 +280,5 @@ def plot_unit_cell(structure: Structure, scale: int = 1):
     add_kpoint_labels(structure, ax)
     #plot the unit cell
     plt.show()
+
+

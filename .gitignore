@@ -10,3 +10,6 @@ tests/
 
 __pycache__/
 profile.*
+
+.venv
+.vscod

@@ -2,25 +2,28 @@ from pathlib import Path
 import lxml.etree as ET
 import numpy as np
 
-def read_vasprun(xml_file_path: str | Path):
+def read_vasprun(xml_file_path: str | Path, debug = False) -> ET.Element:
 
         try:
             tree = ET.parse(xml_file_path)
             root = tree.getroot()
+            if debug:
+                print(f'INFO: Read vasprun.xml file {xml_file_path}')
+                print(f'INFO: Root tag is {root.tag}')
+
+            if root is None:
+                raise Exception('ERROR: Invalid XML file, root is None')
             return root
+        
         except ET.XMLSyntaxError:
 
-            print('ERROR: Invalid XML file')
-            print('ERROR: Check if the vasprun.xml file is complete')
-            print('ERROR: This can either be due to a crash or an incomplete calculation')
+            raise Exception('ERROR: Invalid XML file, root is None')
 
         except FileNotFoundError:
                  
             print(f'ERROR: vasprun xml file {xml_file_path} not found. Maybe you\'re missing a forward slash')
+            raise FileNotFoundError
         
-        except Exception as e:
-            print(e)
-
 
 def unpack_varray(varray: ET.Element) -> np.ndarray:
     """Unpacks a rarray element into a numpy array"""
