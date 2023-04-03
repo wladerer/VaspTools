@@ -6,7 +6,7 @@ vrproj.pkl
 *.pyc
 *.pkl
 
-tests/
+
 
 __pycache__/
 profile.*

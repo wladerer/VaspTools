@@ -1,6 +1,7 @@
 from incar import Incar
 from structure import Structure
 from kspace import ElectronicStructure
+from pathlib import Path
 import yaml
 
 class Job:
@@ -8,10 +9,20 @@ class Job:
     def __init__(self, incar: Incar, structure: Structure, electronics: ElectronicStructure, file: str = None):
         self.incar: Incar = incar
         self.structure: Incar = structure
+        self.electronics: ElectronicStructure = electronics
         self.incar_dict: dict = incar.incar
         self.kpoint_dict: dict = electronics.as_dict()
         self.structure_dict: dict = structure.as_dict()
         self.title: str = file
+
+    @classmethod
+    def from_xml(cls, xml_file: str | Path): 
+        '''Reads in an XML file and returns a Job object'''
+        incar = Incar(xml_file)
+        structure = Structure(xml_file)
+        electronics = ElectronicStructure(xml_file)
+        return cls(incar, structure, electronics)
+
 
     @property
     def yaml_filename(self):
@@ -46,5 +57,8 @@ class Job:
         job_dict = {'incar': self.incar_dict, 'structure': self.structure_dict, 'kpoints': self.kpoint_dict}
         with open(self.yaml_filename, 'w') as file:
             yaml.dump(job_dict, file)
+
+
+
 
 

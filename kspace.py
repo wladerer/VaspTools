@@ -478,10 +478,12 @@ class ElectronicStructure:
     
     def as_dict(self):
         '''Returns a dictionary of kpoint coordinates and generation scheme'''
-        kpoint_dict = {'kpoint_coordinates': self.kpoint_coordinates,
-                       'kpoint_grid_type': self._kpoint_grid_type(),
- }
-        
+        kx, ky, kz = self.kpoint_coordinates.T
+        kpoint_dict = {'kx': kx, 'ky': ky, 'kz': kz, 'kpoint_grid_type': self._kpoint_grid_type(), 'kpath_linemode_divisions': self.kpath_linemode_divisions}
+    
+        return kpoint_dict
+    
+
     def write_kpoints(self, path: Path):
         '''Writes an identical kpoint file for the current calculation'''
         kpoints = self.kpoint_coordinates

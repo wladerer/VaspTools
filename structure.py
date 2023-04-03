@@ -180,7 +180,8 @@ class Structure:
         positions = self.final_positions if is_final else self.initial_positions
         fig = go.Figure(data=[go.Scatter3d(x=positions[:,0], y=positions[:,1], z=positions[:,2], mode='markers', marker=dict(size=10))])
         
-        from plotly_helpers import remove_background_and_axes, add_3d_xyz_vectors
+        from plotter import remove_background_and_axes, add_3d_xyz_vectors
+        
         remove_background_and_axes(fig)
         add_3d_xyz_vectors(fig)
 
