@@ -111,8 +111,30 @@ It is assumed the user knows that the `x`, `y`, and `z` values are not real spac
 
 ### Cached output
 
-Due to the nature of these dataframes getting incredibly large, there are built in features to create a `.pkl` file. This should drastically improve runtime. You are welcome to contact me for advice getting this to work -- I am sympathetic to the owners of slower computers. 
+Due to the nature of these dataframes getting incredibly large, there are built in features to create a `.pkl` file. This should drastically improve runtime. You are welcome to contact me for advice getting this to work -- I am sympathetic to the owners of slower computers.
+
+## Ploting Utilities
+
+Currently, VaspTools supports plotting band structures, 3D band structures, and total density of states. Projected density of states and Fermi Surfaces are in development and should be released soon. As an unusual design choice, plotting has been structured using a functional approach. 
+
+### Example: Comparing band structures
+
+```python 
+
+from kspace import ElectronicStructure
+from plotter import compare_bands
+
+es1 = ElectronicStructure('vasprun1.xml')
+es2 = ElectronicStructure('vasprun2.xml')
+
+compare_bands(es1, es2, emin=-2, emax=2) 
+```
+The above should produe a plot like the following
+
+
+Note that Plotly allows the user to highlight or remove specific bands. Additionally, only bands that have an average energy within the energy range given will be plotted. This was done for both performance and visual considerations. If you have an unusual band structure that may potentially be affected by this choice, it is better to not set `emin` / `emax` and use the zoom and band toggling as needed.  
 ___
+
 ## RAM Mangament
 This entire package has been profiled using the [scalene](https://github.com/emeryberger/scalene) package created by Emery Berger, Sam Stern, and Juan Altmayer Pizzorno. I have used it to manage the performance of each module. 
 
