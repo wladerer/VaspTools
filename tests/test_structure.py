@@ -42,6 +42,15 @@ def test_structure():
     #assert that structure.info is a pandas dataframe
     assert isinstance(structure.info, pd.DataFrame)
 
+    #check if forces returns a numpy array of shape (N, 3) where N is the number of atoms
+    # assert isinstance(structure.forces, np.ndarray)
+    # assert structure.forces.shape == (structure.atom_count, 3)
+
+    # #check if stress returns a numpy array of shape (3, 3)
+    # assert isinstance(structure.stress, np.ndarray)
+    # assert structure.stress.shape == (3, 3)
+    
+
     structure.plot()
 
 

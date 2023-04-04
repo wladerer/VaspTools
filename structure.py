@@ -1,3 +1,4 @@
+from xml.etree.ElementTree import iterparse
 from vasprunio import read_vasprun, unpack_varray
 from pathlib import Path
 import numpy as np
@@ -127,6 +128,22 @@ class Structure:
         formula = formula.replace('1', '')
 
         return formula
+    
+    @property
+    def forces(self) -> np.ndarray:
+        #find <varray name="forces" > using iterparse
+        forces_varray = self.root.find('calculation').find('varray[@name="forces"]')
+        print(forces_varray[0], forces_varray[1], forces_varray[2])
+        forces = unpack_varray(forces_varray)
+
+        return forces
+    
+    @property
+    def stress(self) -> np.ndarray:
+        stress_varray = self.root.find('varray[@name="stress"]')
+        stress = unpack_varray(stress_varray)
+
+        return stress
 
     @property
     def selective_dynamics(self) -> list[list[str]]:

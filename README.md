@@ -70,7 +70,24 @@ vol_change = final_vol - init_vol
 print(vol_change)
 ```
 
-Real space coordinates, reciprocal basis vectors, and much more are available as `numpy.ndarray` objects for ease of use. 
+Real space coordinates, reciprocal basis vectors, and much more are available as `numpy.ndarray` objects for ease of use.
+
+### Pymatgen Interoperability
+
+There are simple methods to convert VaspTools `Structure` objects into pymatgen `Structure` objects. You can therefore have the functionality of both libraries without much trouble. There are also symmetry analyzers and kpath generators included in the `structure` module if you do not want to go through the effort of converting the objects manually
+
+```python
+
+from structure import Structure as vtStructure #easier to differentiate pmg and vt
+from structure import pmg_structure 
+
+structure = vtStructure('vasprun.xml')
+pmgStructure = pmg_Structure(structure)
+
+```
+
+This should create a pymatgen `Structure` object using the **final** structural parameters. 
+
 ___
 
 ## Electronic Structure 
