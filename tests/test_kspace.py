@@ -31,7 +31,8 @@ def test_electronic_structure():
     #assert that data is a pandas dataframe that is not empty
     assert isinstance(electronic_structure.values, pd.DataFrame)
     assert not electronic_structure.values.empty
-    
+
+    print(electronic_structure.values) 
 
 if __name__ == '__main__':
     test_electronic_structure()

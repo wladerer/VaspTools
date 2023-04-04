@@ -291,4 +291,3 @@ def plot_unit_cell(structure: Structure, scale: int = 1):
     #plot the unit cell
     plt.show()
 
-
