@@ -7,7 +7,6 @@ def read_vasprun(xml_file_path: str | Path, debug = False) -> ET.Element:
     #make sure that the xml file exists
     if not Path(xml_file_path).exists():
         raise FileNotFoundError(f'Could not find file {xml_file_path}')
-    
     tree = ET.parse(xml_file_path)
     root = tree.getroot()
 
@@ -16,12 +15,8 @@ def read_vasprun(xml_file_path: str | Path, debug = False) -> ET.Element:
 
 def unpack_varray(varray: ET.Element) -> np.ndarray:
     """Unpacks a rarray element into a numpy array"""
-    v_elements = varray.findall('v')
-    v_strings = [r.text for r in v_elements]
-    v_floats = np.array([np.fromstring(s, dtype=float, sep=' ')
-                        for s in v_strings])
-    varray_array = np.array(v_floats, dtype=float)
-
+    v_strings = [r.text for r in varray.findall('v')]
+    varray_array = np.array([np.fromstring(s, dtype=float, sep=' ') for s in v_strings], dtype=float)
     return varray_array
 
 

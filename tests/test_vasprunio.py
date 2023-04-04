@@ -30,14 +30,18 @@ def test_unpack_varray():
     #make sure that the number of columns in the varray is the same as the number of columns in the numpy array
     assert len(v_entries[0]) == varray_array.shape[1]
 
-    print(varray_array)
+
 
 def test_unpack_rarray():
     """Test unpack_rarray function"""
     xml_file_path = '/home/wladerer/github/VaspTools/tests/vasprun.xml'
     root = read_vasprun(xml_file_path)
-    rarray = root.find('calculation/array/set/rarray')
+
+    rarray = root.find('calculation').find('eigenvalues').find('array').find('set').find('set').find('set')
     rarray_array = unpack_rarray(rarray)
+
+    #make sure that rarray_array is not an empty array
+    assert rarray_array.size != 0
 
     #make sure that the rarray is a numpy array
     assert isinstance(rarray_array, np.ndarray)
@@ -53,8 +57,8 @@ def test_unpack_rarray():
     #make sure that the number of columns in the rarray is the same as the number of columns in the numpy array
     assert len(r_entries[0]) == rarray_array.shape[1]
 
-    print(rarray_array)
 
 if __name__ == '__main__':
     test_read_vasprun()
     test_unpack_varray()
+    test_unpack_rarray()

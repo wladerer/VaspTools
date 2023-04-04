@@ -2,7 +2,7 @@ from kspace import ElectronicStructure, DensityOfStates, make_labels
 import numpy as np
 import pandas as pd
 
-vasprun_xml_file = 'vasprun.xml'
+vasprun_xml_file = '/home/wladerer/github/VaspTools/tests/vasprun.xml'
 electronic_structure = ElectronicStructure(vasprun_xml_file)
 
 def test_electronic_structure():
@@ -31,9 +31,6 @@ def test_electronic_structure():
     #assert that data is a pandas dataframe that is not empty
     assert isinstance(electronic_structure.values, pd.DataFrame)
     assert not electronic_structure.values.empty
-
-    
-
     
 
 if __name__ == '__main__':
