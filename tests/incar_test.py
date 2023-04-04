@@ -3,15 +3,15 @@ from incar import Incar
 
 def test_incar():
 
-    incar_test_file = Incar(Path('vasprun.xml'))
+    incar_test_file = Incar('/home/wladerer/github/VaspTools/tests/vasprun.xml')
     
     #make sure that the incar dictionary is not empty
     assert incar_test_file.incar.keys() != []
 
-    #make sure that the incar dictionary keys only has int, float, or str values
+    #make sure that the incar dictionary keys only has int, float, bool, or str values
     for key, value in incar_test_file.incar.items():
         assert type(key) == str
-        assert type(value) == str or type(value) == int or type(value) == float
+        assert type(value) == str or type(value) == int or type(value) == float or type(value) == bool
 
     #add a new key to the incar dictionary
     incar_test_file['test_key'] = 'test_value'

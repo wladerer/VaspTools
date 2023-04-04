@@ -6,10 +6,10 @@ import yaml
 
 class Incar:
 
-    def __init__(self, path: Path):
+    def __init__(self, xml_file: Path | str):
         '''Creates an Incar object from a vasprun.xml file.'''
-        self.path = path
-        self.root = read_vasprun(path)
+        self.path = xml_file
+        self.root = read_vasprun(xml_file)
         self.incar = self.create_incar_dictionary()
 
 

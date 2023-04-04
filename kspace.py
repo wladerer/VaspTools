@@ -589,3 +589,13 @@ def ignore_ion(df: pd.DataFrame) -> pd.DataFrame:
     df = df.drop('ion', axis=1)
     return df
 
+
+def speed_test():
+    vasprun_xml_file = 'tests/vasprun.xml'
+    vasprun_xml_file2 = '/home/wladerer/github/VaspTools/tests/soc_kpoint_mesh_test_file.xml'
+
+    electronic_structure = ElectronicStructure(vasprun_xml_file)
+    electronic_structure2 = ElectronicStructure(vasprun_xml_file2)
+
+    electronic_structure.values
+    electronic_structure2.values
