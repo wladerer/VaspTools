@@ -6,7 +6,8 @@ vrproj.pkl
 *.pyc
 *.pkl
 
-
+.vscode/
+.pytest_cache/
 
 __pycache__/
 profile.*

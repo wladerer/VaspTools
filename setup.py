@@ -10,6 +10,7 @@ setup(
         'polars',
         'numpy',
         'matplotlib',
-        'pymatgen'
+        'pymatgen',
+        'periodictable'
     ]
 )
