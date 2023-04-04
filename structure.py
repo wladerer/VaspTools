@@ -192,7 +192,15 @@ class Structure:
         positions = self.final_positions if is_final else self.initial_positions
         return {'basis': self.final_basis.tolist(), 'positions': positions.tolist(), 'atom_types': self.atom_types}
 
-
+    @property
+    def symmetry(self) -> list[str, int]:
+        '''Returns the symmetry of the structure'''
+        return get_symmetry(self)
+    
+    @property
+    def pmg_kpath(self) -> dict:
+        '''Returns the high symmetry kpoints'''
+        return get_high_symm_kpath(self)
         
 
 def pmg_structure(structure: Structure) -> pmgStructure:
@@ -211,7 +219,8 @@ def get_symmetry(structure: Structure) -> list[str,int]:
 def get_high_symm_kpath(structure: Structure) -> dict:
     '''Returns high symmetry kpoints'''
     structure = pmg_structure(structure)
-    kpoints = HighSymmKpath(structure).kpath
+    pmgKpath_obj = HighSymmKpath(structure)
+    kpoints = pmgKpath_obj.kpath
     return kpoints
 
 def create_paralleliped(structure: Structure, scale: int = 1) -> list:

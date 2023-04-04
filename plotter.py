@@ -221,10 +221,7 @@ def compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStr
     fig.add_hline(y=0, line_width=0.5, line_color="grey")
 
     # make background white
-    fig.update_layout(plot_bgcolor='white')
-
-    # make paper white
-    fig.update_layout(paper_bgcolor='white')
+    fig.update_layout(plot_bgcolor='white', paper_bgcolor='white')
 
     # make figure axes black lines
     fig.update_xaxes(showline=True, linewidth=1, linecolor='black')
