@@ -5,3 +5,8 @@ VaspTools.egg-info/SOURCES.txt
 VaspTools.egg-info/dependency_links.txt
 VaspTools.egg-info/requires.txt
 VaspTools.egg-info/top_level.txt
+tests/__init__.py
+tests/test_incar.py
+tests/test_kspace.py
+tests/test_structure.py
+tests/test_vasprunio.py

@@ -4,3 +4,4 @@ polars
 numpy
 matplotlib
 pymatgen
+periodictable

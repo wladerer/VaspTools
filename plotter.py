@@ -71,7 +71,7 @@ def filter_bands(df: pd.DataFrame, emin: float = None,  emax: float = None):
 
 def create_band_traces(electronics: ElectronicStructure, emin: float = None, emax: float = None):
     '''Create the band traces for the plotly figure.'''
-    kpoints = electronics.kpoints
+    kpoints = electronics.values
     kpoints['energy'] -= electronics.fermi_energy
     kpoints = filter_bands(kpoints, emin, emax)
 
@@ -88,8 +88,8 @@ def add_fermi_line(fig):
 
 def add_kpoint_divisions(fig, electronics: ElectronicStructure):
     '''Adds vertical lines at the kpoint divisions to seperate paths.'''
-    divisions = electronics.kpoint_linemode_divisions
-    for i in range(1, len(electronics.kpoints) + 1, divisions):
+    divisions = electronics.kpath_linemode_divisions
+    for i in range(1, len(electronics.kpoint_coordinates) + 2, divisions):
         fig.add_vline(x=i - 0.5, line_width=0.5, line_color="black")
 
     return divisions
@@ -121,7 +121,7 @@ def plot_bandstructure(electronics: ElectronicStructure, emin: float = None,  em
 
     if labels != None:
         kpoint_tick_val = np.arange(
-            0, len(electronics.kpoints) + 1, divisions) + 0.5
+            0, len(electronics.kpoint_coordinates) + 1, divisions) + 0.5
         fig.update_layout(xaxis=dict(
             tickmode='array', tickvals=kpoint_tick_val, ticktext=labels, tickfont=dict(size=18)))
 
@@ -132,9 +132,41 @@ def plot_bandstructure(electronics: ElectronicStructure, emin: float = None,  em
 
     return trace
 
+def plot_2d(electronics: ElectronicStructure, bands: list[int], title: str = None):
+    '''Plot the 2D band structure for the given bands.'''
+
+    # get the bands
+    band_indices = bands
+    bands = [electronics.band(band) for band in bands]
+
+    # plot the bands together
+    fig = go.Figure()
+    fermi_energy = electronics.fermi_energy
+    for band in bands:
+
+        mesh = go.Mesh3d(x=2*band['x'], y=2*band['y'], z=band['energy'] -
+                         fermi_energy, showscale=False)
+        fig.add_trace(mesh)
+
+    # add a legend indicating the band number
+    fig.update_scenes(xaxis_title='kx', yaxis_title='ky',
+                      zaxis_title='E - Ef (eV)')
+
+
+    if title == None:
+        title = f'3D Band Structure (bands {", ".join(str(band) for band in band_indices)})'
+
+    #update the color of the traces 
+    for i in range(len(bands)):
+        fig.data[i].update(colorscale='Viridis', showscale=False)
+
+    fig.update_layout(title=title, title_x=0.5)
+
+    fig.show()
+
 
 def plotly_compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStructure, emin: float = -2.0, emax: float = 2.0, show: bool = True, save: bool = False, labels: list[str] = None, title: str = None, legend: bool = True):
-    '''Plots two bandstructures on the same plot in different colors.'''
+    '''Plots two 1D bandstructures on the same plot in different colors.'''
     bands1 = create_band_traces(electronics1, emin, emax)
     bands2 = create_band_traces(electronics2, emin, emax)
 
