@@ -628,5 +628,42 @@ def speed_test():
     electronic_structure.values
     # electronic_structure2.values
 
+def generate_kpoint_mesh(kpoint_sampling: list[int]) -> np.ndarray:
+    '''Generates a 3d mesh of kpoints in the BZ'''
+    kx, ky, kz = kpoint_sampling
+    x = np.linspace(0, 1, kx)
+    y = np.linspace(0, 1, ky)
+    z = np.linspace(0, 1, kz)
 
-speed_test()
+    xx, yy, zz = np.meshgrid(x, y, z)
+
+    points = np.column_stack((xx.ravel(), yy.ravel(), zz.ravel()))
+
+    return points
+
+def generate_kpoint_plane(plane: list[int]) -> np.ndarray:
+    '''Generates a plane of kpoints in the BZ'''
+    x, y, z = plane
+    p1 = np.array([x, 0, 0])
+    p2 = np.array([0, y, 0])
+    p3 = np.array([0, 0, z])
+
+    # Calculate the normal vector of the plane
+    normal = np.cross(p2 - p1, p3 - p1)
+
+    # Define a grid of points in the x-y plane
+    x, y = np.meshgrid(np.linspace(0, 1, 10), np.linspace(0, 1, 10))
+
+    # Calculate the z-coordinate of each point on the plane
+    z = (-normal[0] * x - normal[1] * y - np.dot(normal, p1)) / normal[2]
+
+    # Stack the x, y, and z coordinates into a single array
+    points = np.column_stack((x.ravel(), y.ravel(), z.ravel()))
+
+
+    # Check if [0, 0, 0] is in the array
+    if not any(np.all(point == [0, 0, 0]) for point in points):
+        # Add [0, 0, 0] to the array
+        points = np.vstack((points, [0, 0, 0]))
+
+    return points

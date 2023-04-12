@@ -69,7 +69,8 @@ def filter_bands(df: pd.DataFrame, emin: float = None,  emax: float = None):
     return bands
 
 
-def create_band_traces(electronics: ElectronicStructure, emin: float = None, emax: float = None):
+
+def create_band_traces(electronics: ElectronicStructure, emin: float = None, emax: float = None) -> pd.DataFrame:
     '''Create the band traces for the plotly figure.'''
     kpoints = electronics.values
     kpoints['energy'] -= electronics.fermi_energy
@@ -80,6 +81,14 @@ def create_band_traces(electronics: ElectronicStructure, emin: float = None, ema
 
     return bands
 
+def create_band_trace(electronics: ElectronicStructure, band: int):
+    '''Create the band traces for the plotly figure.'''
+    kpoints = electronics.values
+    kpoints['energy'] -= electronics.fermi_energy
+
+    band = kpoints[kpoints['band'] == band]
+
+    return band
 
 def add_fermi_line(fig):
     '''Adds a horizontal line at the fermi energy.'''
@@ -131,6 +140,32 @@ def plot_bandstructure(electronics: ElectronicStructure, emin: float = None,  em
         fig.show()
 
     return trace
+
+def plot_specific_bands(electronics: ElectronicStructure, bands: list[int], labels=None, show=True, legend: bool = True):
+    '''Plot 1D bandstructure for the given bands.'''
+    fig = go.Figure()
+    bands = pd.concat([create_band_trace(electronics, band) for band in bands])
+
+    #create the band traces , color them according to band index
+    fig.add_trace(go.Scatter(x=bands['kpoint'], y=bands['energy'], line_width=2, line_shape='spline', line_smoothing=0.5, colorscale='Viridis', color=bands['energy']))
+
+
+
+    add_fermi_line(fig)
+    divisions = add_kpoint_divisions(fig, electronics)
+
+    if labels != None:
+        kpoint_tick_val = np.arange(
+            0, len(electronics.kpoint_coordinates) + 1, divisions) + 0.5
+        fig.update_layout(xaxis=dict(
+            tickmode='array', tickvals=kpoint_tick_val, ticktext=labels, tickfont=dict(size=18)))
+        
+    customize_bandstructure_layout(fig)
+
+    if show:
+        fig.show()
+
+
 
 def plot_2d(electronics: ElectronicStructure, bands: list[int], title: str = None):
     '''Plot the 2D band structure for the given bands.'''
@@ -287,3 +322,32 @@ def compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStr
     if show:
         fig.show()
 
+def plot_kpath_against_energy(es: ElectronicStructure, band: int):
+    '''Plot the kpath against the energy of a given band'''
+
+    path = es.kpoint_coordinates
+    energies: pd.DataFrame = es.kpoint_energies
+
+    energies = energies[energies['band'] == band].sort_values(by=['kpoint'])['energy'].to_numpy() - es.fermi_energy
+
+    fig = go.Figure(data=[go.Scatter3d(x=path[:, 0], y=path[:, 1], z=path[:, 2], mode='markers', marker=dict(color=energies, colorscale='inferno', showscale=True, size=5))])
+    fig.update_traces(connectgaps=False)
+    #add title "Band 94"
+    fig.update_layout(title=f'Band {band}', title_x=0.5)
+
+    #add axis labels x= kx, y=ky, z=kz
+    fig.update_layout(scene = dict( xaxis_title='kx', yaxis_title='ky', zaxis_title='kz'))
+    fig.show()
+
+def compare_kpaths(kpath1, kpath2):
+    '''Plot two kpaths against each other'''
+    fig = go.Figure(data=[go.Scatter3d(x=kpath1[:, 0], y=kpath1[:, 1], z=kpath1[:, 2], mode='markers', marker=dict(color='red', size=5))])
+    fig.add_trace(go.Scatter3d(x=kpath2[:, 0], y=kpath2[:, 1], z=kpath2[:, 2], mode='markers', marker=dict(color='blue', size=5)))
+    fig.update_traces(connectgaps=False)
+    fig.update_layout(title='Kpaths', title_x=0.5)
+    #add legend for colors
+    fig.update_layout(legend=dict( yanchor="top", y=0.99, xanchor="left", x=0.01))
+
+    #add axis labels x= kx, y=ky, z=kz
+    fig.update_layout(scene = dict( xaxis_title='kx', yaxis_title='ky', zaxis_title='kz'))
+    fig.show()
