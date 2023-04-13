@@ -13,4 +13,8 @@ __pycache__/
 profile.*
 
 .venv
-.vscod
+.vscode/
+
+_templates/
+_static/
+

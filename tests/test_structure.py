@@ -3,7 +3,7 @@ from pymatgen.core.structure import Structure as pmgStructure
 import numpy as np
 import pandas as pd
 
-vasprun_xml_file = 'vasprun.xml'
+vasprun_xml_file = 'tests/vasprun.xml'
 structure = Structure(vasprun_xml_file)
 
 def test_structure():
@@ -50,8 +50,6 @@ def test_structure():
     # assert isinstance(structure.stress, np.ndarray)
     # assert structure.stress.shape == (3, 3)
     
-
-    structure.plot()
 
 
 def test_symmetry_tools():
