@@ -395,45 +395,6 @@ def plot_isoplane(es: ElectronicStructure, isoval: float = 0.0, tolerance: float
     fig.update_layout(scene_aspectmode='cube')
     fig.show()
 
-def plot_fermi_heatmap(electronics: ElectronicStructure, title: str = None):
-    '''Plots the fermi surface'''
-    kpoints = electronics.values
-    # get bands within the energy range fermi_energy - 0.2 and fermi_energy + 0.2
-    fermi_surface = kpoints[np.isclose(
-        kpoints['energy'], electronics.fermi_energy, rtol=0.08)]
-    # plot kx vs ky with energy as the color in a contour plot with contour smoothing
-    import plotly.graph_objects as go
-
-    kx = fermi_surface['x']
-    ky = fermi_surface['y']
-    kz = fermi_surface['z']
-    occupation = fermi_surface['occupation']
-
-    # make subplots for kx vs ky, kx vs kz, and ky vs kz
-    fig = make_subplots(rows=1, cols=3)
-
-    fig.add_trace(go.Heatmap(x=kx, y=ky, z=occupation, showscale=True,
-                  connectgaps=True, zsmooth='best', name=r'$k_x ^ k_y$'), row=1, col=1)
-    fig.add_trace(go.Heatmap(x=kx, y=kz, z=occupation, showscale=True,
-                  connectgaps=True, zsmooth='best', name=r'$k_x ^ k_z$'), row=1, col=2)
-    fig.add_trace(go.Heatmap(x=ky, y=kz, z=occupation, showscale=True,
-                  connectgaps=True, zsmooth='best', name=r'$k_y ^ k_z'), row=1, col=3)
-
-    # label kx and ky
-    fig.update_xaxes(title_text=r'$k_x$', row=1, col=1)
-    fig.update_xaxes(title_text=r'$k_x$', row=1, col=2)
-    fig.update_xaxes(title_text=r'$k_y$', row=1, col=3)
-    fig.update_yaxes(title_text=r'$k_y$', row=1, col=1)
-    fig.update_yaxes(title_text=r'$k_z$', row=1, col=2)
-    fig.update_yaxes(title_text=r'$k_z$', row=1, col=3)
-
-    fig.update_traces(hovertemplate='Occupancy: %{z:.2f}')
-
-    # add title to figure
-    if title == None:
-        title = f'Occupation Heatmap near the Fermi Energy: {electronics.fermi_energy:.2f} eV'
-    fig.update_layout(title_text=title, title_x=0.5)
-    fig.show()
 
 def plot_band_contour(electronics: ElectronicStructure, band=None, title: str = None):
     '''Plots the band structure as a contour plot'''
