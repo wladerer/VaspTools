@@ -1,4 +1,4 @@
-from kspace import ElectronicStructure, DensityOfStates, make_labels
+from kspace import ElectronicStructure
 import numpy as np
 import pandas as pd
 

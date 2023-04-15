@@ -1,13 +1,9 @@
 from vasprunio import read_vasprun, unpack_varray, unpack_rarray
-from structure import Structure
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import pickle
 import os
-
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 
 def get_kpath_labels(path: Path) -> list:
