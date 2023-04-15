@@ -468,5 +468,3 @@ def plot_band_contour(electronics: ElectronicStructure, band=None, title: str = 
         fig.update_layout(coloraxis_colorbar=dict(title=r'$E - E_f$ (eV)'))
         fig.show()
 
-
-
