@@ -667,3 +667,28 @@ def generate_kpoint_plane(plane: list[int]) -> np.ndarray:
         points = np.vstack((points, [0, 0, 0]))
 
     return points
+
+
+def isosurface_bands(electronics: ElectronicStructure, energy: float) -> list[pd.DataFrame]:
+    # get kpoints where the energy is roughly equal to an energy value
+
+    isosurface = electronics.values[np.isclose(
+        electronics.values['energy'], energy, rtol=0.05)]
+
+    if isosurface.empty:
+        print(f'No kpoints found wth an energy of {energy} eV')
+        print('Retrying at a lower tolerance')
+        isosurface = electronics.values[np.isclose(
+            electronics.values['energy'], energy, rtol=0.08)]
+        if isosurface.empty:
+            raise ValueError(f'No kpoints found with an energy of {energy} eV')
+
+    # get the bands that are on the surface
+    bands = isosurface['band'].unique()
+
+    isosurface_bands = []
+    for band in bands:
+        isosurface_bands.append(
+            isosurface[isosurface['band'] == band])
+
+    return isosurface_bands

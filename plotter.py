@@ -351,3 +351,122 @@ def compare_kpaths(kpath1, kpath2):
     #add axis labels x= kx, y=ky, z=kz
     fig.update_layout(scene = dict( xaxis_title='kx', yaxis_title='ky', zaxis_title='kz'))
     fig.show()
+
+
+def plot_energy_isosurface(es: ElectronicStructure, isoval: float = 0.0, tolerance: float = None):
+    '''Plot the energy isosurface at a given energy value'''
+
+    #get the kpoint coordinates
+    path = es.kpoint_coordinates
+    #get the kpoint energies
+    energies: pd.DataFrame = es.kpoint_energies
+
+    if tolerance is None:
+        #get the average difference between kpoint energies
+        tolerance = np.mean(np.diff(energies['energy'].to_numpy()))
+    
+    #plot x, y, and z coordinates of kpoints with energy rougly equal to isoval as a mesh grid
+    fig = go.Figure(data=[go.Mesh3d(x=path[:, 0], y=path[:, 1], z=path[:, 2]) ] )
+
+    fig.update_layout(title=f'Energy isosurface at {isoval} eV', title_x=0.5)
+    #make aspect ratio equal
+    fig.update_layout(scene_aspectmode='cube')
+    fig.show()
+    
+
+def plot_isoplane(es: ElectronicStructure, isoval: float = 0.0, tolerance: float = None):
+    '''Plot the energy isoplane at a given energy value'''
+    from kspace import isosurface_bands
+
+
+    if tolerance is None:
+        #get the average difference between kpoint energies
+        tolerance = np.mean(np.diff(es.kpoint_energies))
+
+    bands: list[pd.DataFrame] = isosurface_bands(es, isoval)
+
+    #plot x and y coordinates as a 2d scatter plot (line mode) with color corresponding to energy, for each band
+    fig = go.Figure()
+    for band in bands:
+        fig.add_trace(go.Scatter(x=band['x'], y=band['y'], mode='lines'))
+
+    fig.update_layout(title=f'Energy isoplane at {isoval} eV', title_x=0.5)
+    #make aspect ratio equal
+    fig.update_layout(scene_aspectmode='cube')
+    fig.show()
+
+def plot_fermi_heatmap(electronics: ElectronicStructure, title: str = None):
+    '''Plots the fermi surface'''
+    kpoints = electronics.values
+    # get bands within the energy range fermi_energy - 0.2 and fermi_energy + 0.2
+    fermi_surface = kpoints[np.isclose(
+        kpoints['energy'], electronics.fermi_energy, rtol=0.08)]
+    # plot kx vs ky with energy as the color in a contour plot with contour smoothing
+    import plotly.graph_objects as go
+
+    kx = fermi_surface['x']
+    ky = fermi_surface['y']
+    kz = fermi_surface['z']
+    occupation = fermi_surface['occupation']
+
+    # make subplots for kx vs ky, kx vs kz, and ky vs kz
+    fig = make_subplots(rows=1, cols=3)
+
+    fig.add_trace(go.Heatmap(x=kx, y=ky, z=occupation, showscale=True,
+                  connectgaps=True, zsmooth='best', name=r'$k_x ^ k_y$'), row=1, col=1)
+    fig.add_trace(go.Heatmap(x=kx, y=kz, z=occupation, showscale=True,
+                  connectgaps=True, zsmooth='best', name=r'$k_x ^ k_z$'), row=1, col=2)
+    fig.add_trace(go.Heatmap(x=ky, y=kz, z=occupation, showscale=True,
+                  connectgaps=True, zsmooth='best', name=r'$k_y ^ k_z'), row=1, col=3)
+
+    # label kx and ky
+    fig.update_xaxes(title_text=r'$k_x$', row=1, col=1)
+    fig.update_xaxes(title_text=r'$k_x$', row=1, col=2)
+    fig.update_xaxes(title_text=r'$k_y$', row=1, col=3)
+    fig.update_yaxes(title_text=r'$k_y$', row=1, col=1)
+    fig.update_yaxes(title_text=r'$k_z$', row=1, col=2)
+    fig.update_yaxes(title_text=r'$k_z$', row=1, col=3)
+
+    fig.update_traces(hovertemplate='Occupancy: %{z:.2f}')
+
+    # add title to figure
+    if title == None:
+        title = f'Occupation Heatmap near the Fermi Energy: {electronics.fermi_energy:.2f} eV'
+    fig.update_layout(title_text=title, title_x=0.5)
+    fig.show()
+
+def plot_band_contour(electronics: ElectronicStructure, band=None, title: str = None):
+    '''Plots the band structure as a contour plot'''
+    kpoints = electronics.values
+
+    if band == None:
+
+        # get the band that is closest to the fermi energy
+        band = kpoints[np.isclose(
+            kpoints['energy'], electronics.fermi_energy, rtol=0.05)]
+        band = band[band['band'] == band['band'].max()]
+
+    else:
+        band = electronics.band(band)
+
+    # plot kx vs ky with energy as the color in a contour plot with contour smoothing
+    import plotly.graph_objects as go
+
+    kx = band['x']
+    ky = band['y']
+    energy = band['energy'] - electronics.fermi_energy
+
+    if len(kx) == 0 or len(ky) == 0 or len(energy) == 0:
+        print("Cannot plot an empty plot")
+    else:
+        fig = go.Figure(data=go.Contour(x=kx, y=ky, z=energy, colorscale='rdbu',
+                        contours=dict(coloring='heatmap'), line_smoothing=1.2))
+        # label kx and ky
+        fig.update_xaxes(title_text=r'$k_x$')
+        fig.update_yaxes(title_text='$k_y$')
+        # label energy
+        fig.update_layout(coloraxis_colorbar=dict(title=r'$E - E_f$ (eV)'))
+        fig.show()
+
+
+
