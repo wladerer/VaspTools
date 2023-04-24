@@ -70,10 +70,14 @@ def filter_bands(df: pd.DataFrame, emin: float = None,  emax: float = None):
 
 
 
-def create_band_traces(electronics: ElectronicStructure, emin: float = None, emax: float = None) -> pd.DataFrame:
+def create_band_traces(electronics: ElectronicStructure, emin: float = None, emax: float = None, fermi_energy: float= None) -> pd.DataFrame:
     '''Create the band traces for the plotly figure.'''
+    
+    if fermi_energy is None:
+        fermi_energy = electronics.fermi_energy
+
     kpoints = electronics.values
-    kpoints['energy'] -= electronics.fermi_energy
+    kpoints['energy'] -= fermi_energy
     kpoints = filter_bands(kpoints, emin, emax)
 
     bands = kpoints.groupby('band').filter(
@@ -81,10 +85,12 @@ def create_band_traces(electronics: ElectronicStructure, emin: float = None, ema
 
     return bands
 
-def create_band_trace(electronics: ElectronicStructure, band: int):
+def create_band_trace(electronics: ElectronicStructure, band: int, fermi_energy: float= None):
     '''Create the band traces for the plotly figure.'''
+    if fermi_energy is None:
+        fermi_energy = electronics.fermi_energy
     kpoints = electronics.values
-    kpoints['energy'] -= electronics.fermi_energy
+    kpoints['energy'] -= fermi_energy
 
     band = kpoints[kpoints['band'] == band]
 
@@ -118,9 +124,12 @@ def customize_bandstructure_layout(fig):
     )
 
 
-def plot_bandstructure(electronics: ElectronicStructure, emin: float = None,  emax=None, labels=None, show=True, legend: bool = True) -> px.line:
+def plot_bandstructure(electronics: ElectronicStructure, emin: float = None,  emax=None, labels=None, show=True, legend: bool = True, fermi_energy: float = None) -> px.line:
     '''Plot the bandstructure.'''
-    bands = create_band_traces(electronics, emin, emax)
+    if fermi_energy is None:
+        fermi_energy = electronics.fermi_energy
+
+    bands = create_band_traces(electronics, emin, emax, fermi_energy=fermi_energy)
 
     trace = go.Scatter(x=bands['kpoint'], y=bands['energy'], line_color='blue', line_width=2, line_shape='spline', line_smoothing=0.5)
     fig = px.line(bands, x='kpoint', y='energy', color_discrete_sequence=['blue'], color='band')
@@ -141,10 +150,13 @@ def plot_bandstructure(electronics: ElectronicStructure, emin: float = None,  em
 
     return trace
 
-def plot_specific_bands(electronics: ElectronicStructure, bands: list[int], labels=None, show=True, legend: bool = True):
+def plot_specific_bands(electronics: ElectronicStructure, bands: list[int], labels=None, show=True, legend: bool = True, fermi_energy: float = None):
     '''Plot 1D bandstructure for the given bands.'''
+    if fermi_energy is None:
+        fermi_energy = electronics.fermi_energy
+
     fig = go.Figure()
-    bands = pd.concat([create_band_trace(electronics, band) for band in bands])
+    bands = pd.concat([create_band_trace(electronics, band, fermi_energy=fermi_energy) for band in bands])
 
     #create the band traces , color them according to band index
     fig.add_trace(go.Scatter(x=bands['kpoint'], y=bands['energy'], line_width=2, line_shape='spline', line_smoothing=0.5, colorscale='Viridis', color=bands['energy']))
@@ -179,8 +191,10 @@ def plot_2d(electronics: ElectronicStructure, bands: list[int], title: str = Non
     fermi_energy = electronics.fermi_energy
     for band in bands:
 
+        
         mesh = go.Mesh3d(x=2*band['x'], y=2*band['y'], z=band['energy'] -
                          fermi_energy, showscale=False)
+        
         fig.add_trace(mesh)
 
     # add a legend indicating the band number
@@ -199,11 +213,46 @@ def plot_2d(electronics: ElectronicStructure, bands: list[int], title: str = Non
 
     fig.show()
 
+def plot_2dsurface(electronics: ElectronicStructure, bands: list[int], title: str = None):
+    '''Plot the 2D band structure for the given bands.'''
 
-def plotly_compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStructure, emin: float = -2.0, emax: float = 2.0, show: bool = True, save: bool = False, labels: list[str] = None, title: str = None, legend: bool = True):
+    # get the bands
+    band_indices = bands
+    bands = [electronics.band(band) for band in bands]
+
+    # plot the bands together
+    fig = go.Figure()
+    fermi_energy = electronics.fermi_energy
+    for band in bands:
+
+        print(band['x'])
+        print(band['y'])
+        print(band['energy'])
+        mesh = go.Surface(x=band['x'], y=band['y'], z=band['energy'] - fermi_energy)
+        
+        fig.add_trace(mesh)
+
+    # add a legend indicating the band number
+    fig.update_scenes(xaxis_title='kx', yaxis_title='ky',
+                      zaxis_title='E - Ef (eV)')
+
+
+    if title == None:
+        title = f'3D Band Structure (bands {", ".join(str(band) for band in band_indices)})'
+
+
+    fig.update_layout(title=title, title_x=0.5)
+
+    fig.show()
+
+def plotly_compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStructure, emin: float = -2.0, emax: float = 2.0, show: bool = True, save: bool = False, labels: list[str] = None, title: str = None, legend: bool = True, fermi_energy: float = None):
     '''Plots two 1D bandstructures on the same plot in different colors.'''
-    bands1 = create_band_traces(electronics1, emin, emax)
-    bands2 = create_band_traces(electronics2, emin, emax)
+
+    if fermi_energy is None:
+        fermi_energy = electronics1.fermi_energy
+
+    bands1 = create_band_traces(electronics1, emin, emax, fermi_energy=fermi_energy)
+    bands2 = create_band_traces(electronics2, emin, emax, fermi_energy=fermi_energy)
 
     fig = go.Figure()
 
@@ -228,7 +277,7 @@ def plotly_compare_bands(electronics1: ElectronicStructure, electronics2: Electr
     fig.update_yaxes(showline=True, linewidth=1, linecolor='black')
 
     # add vertical lines at every n*kpoint_linemode_divisions kpoint
-    divisions = electronics1.kpoint_linemode_divisions
+    divisions = electronics1.kpath_linemode_divisions
     vlines = [i - 0.5 for i in range(1, len(electronics1.kpoints) + 1, divisions)]
     fig.add_vline(x=vlines, line_width=0.5, line_color="black")
 
@@ -257,10 +306,13 @@ def plotly_compare_bands(electronics1: ElectronicStructure, electronics2: Electr
 
 
 
-def compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStructure, emin: float = -2.0, emax: float = 2.0, show: bool = True, save: bool = False, labels: list[str] = None, title: str = None, legend: bool = True):
+def compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStructure, emin: float = -2.0, emax: float = 2.0, show: bool = True, save: bool = False, labels: list[str] = None, title: str = None, legend: bool = True, fermi_energy: float = None):
     '''Plots two bandstructures on the same plot in different colors.'''
-    bands1 = create_band_traces(electronics1, emin, emax)
-    bands2 = create_band_traces(electronics2, emin, emax)
+    if fermi_energy is None:
+        fermi_energy = electronics1.fermi_energy
+
+    bands1 = create_band_traces(electronics1, emin, emax, fermi_energy=fermi_energy)
+    bands2 = create_band_traces(electronics2, emin, emax, fermi_energy=fermi_energy)
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
@@ -293,22 +345,23 @@ def compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStr
     # make figure axes black lines
     fig.update_xaxes(showline=True, linewidth=1, linecolor='black')
     fig.update_yaxes(showline=True, linewidth=1, linecolor='black')
-    # add vertical lines at every n*kpoint_linemode_divisions kpoint
-    divisions = electronics1.kpoint_linemode_divisions
-    vlines = [i - 0.5 for i in range(1, len(electronics1.kpoints) + 1, divisions)]
-    fig.add_vline(x=vlines, line_width=0.5, line_color="black")
+
+
+    divisions = electronics1.kpath_linemode_divisions
+  
 
     if labels is not None:
         # create array of kpoint vals
         kpoint_tick_val = np.arange(
-            0, len(electronics1.kpoints) + 1, divisions) + 0.5
+            0, len(electronics1.kpoint_coordinates) + 1, divisions) + 0.5
         fig.update_layout(xaxis=dict(
-            tickmode='array', tickvals=kpoint_tick_val, ticktext=labels, tickfont=dict(size=18)))
+            tickmode='array', tickvals=kpoint_tick_val, ticktext=labels, tickfont=dict(size=18)), overwrite=False)
 
     fig.update_layout(font=dict(size=18))
 
     if not legend:
         fig.update_layout(showlegend=False)
+
 
     if title is not None:
         # use latex for title
@@ -318,6 +371,10 @@ def compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStr
 
     if save:
         fig.write_image(title + '.png')
+
+
+    add_fermi_line(fig)
+    add_kpoint_divisions(fig, electronics1)
 
     if show:
         fig.show()
@@ -396,38 +453,36 @@ def plot_isoplane(es: ElectronicStructure, isoval: float = 0.0, tolerance: float
     fig.show()
 
 
-def plot_band_contour(electronics: ElectronicStructure, band=None, title: str = None):
+
+
+def plot_band_contour(electronics: ElectronicStructure, bands = list[int], title: str = None):
     '''Plots the band structure as a contour plot'''
-    kpoints = electronics.values
+    
+    bands = pd.concat([ electronics.band(band) for band in bands])
 
-    if band == None:
+    num_bands = len(bands['band'].unique())
+    fig = make_subplots(rows=1, cols=num_bands)
+    
+    for i, band in enumerate(bands['band'].unique()):
+        fig.add_trace(go.Contour(
+            x=bands[bands['band'] == band]['x'],
+            z=bands[bands['band'] == band]['energy'] - electronics.fermi_energy,
+            y=bands[bands['band'] == band]['y'],
+            colorscale='rdbu',
+            showscale=False,
+            contours=dict(
+                coloring='lines',
+                showlines=True,
+                start=0,
+                end=1,
+                size=0.01
+            )
+        ), row=1, col=i+1)
 
-        # get the band that is closest to the fermi energy
-        band = kpoints[np.isclose(
-            kpoints['energy'], electronics.fermi_energy, rtol=0.05)]
-        band = band[band['band'] == band['band'].max()]
+    fig.update_layout(title=title, title_x=0.5)
 
-    else:
-        band = electronics.band(band)
 
-    # plot kx vs ky with energy as the color in a contour plot with contour smoothing
-    import plotly.graph_objects as go
 
-    kx = band['x']
-    ky = band['y']
-    energy = band['energy'] - electronics.fermi_energy
-
-    if len(kx) == 0 or len(ky) == 0 or len(energy) == 0:
-        print("Cannot plot an empty plot")
-    else:
-        fig = go.Figure(data=go.Contour(x=kx, y=ky, z=energy, colorscale='rdbu',
-                        contours=dict(coloring='heatmap'), line_smoothing=1.2))
-        # label kx and ky
-        fig.update_xaxes(title_text=r'$k_x$')
-        fig.update_yaxes(title_text='$k_y$')
-        # label energy
-        fig.update_layout(coloraxis_colorbar=dict(title=r'$E - E_f$ (eV)'))
-        fig.show()
 
 
 
