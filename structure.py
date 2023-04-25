@@ -5,8 +5,12 @@ import numpy as np
 import pandas as pd
 
 from pymatgen.core import Structure as pmgStructure
+from pymatgen.core import Molecule as pmgMolecule
+from pymatgen.analysis.adsorption import AdsorbateSiteFinder
+from pymatgen.core.surface import SlabGenerator
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.symmetry.bandstructure import HighSymmKpath
+
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.pyplot as plt
@@ -210,7 +214,7 @@ class Structure:
         return {'basis': self.final_basis.tolist(), 'positions': positions.tolist(), 'atom_types': self.atom_types}
 
     @property
-    def symmetry(self) -> list[str, int]:
+    def symmetry(self) -> tuple[str, int]:
         '''Returns the symmetry of the structure'''
         return get_symmetry(self)
     
@@ -227,20 +231,20 @@ def pmg_structure(structure: Structure) -> pmgStructure:
     coords = structure.final_positions
     return pmgStructure(lattice, species, coords)
 
-def get_symmetry(structure: Structure) -> list[str,int]:
+def get_symmetry(structure: Structure) -> tuple[str,int]:
     '''Returns symmetry of the structure'''
     structure: pmgStructure = pmg_structure(structure) 
     analyzer = SpacegroupAnalyzer(structure)
     return analyzer.get_space_group_symbol(), analyzer.get_space_group_number()
 
-def get_high_symm_kpath(structure: Structure) -> dict:
+def get_high_symm_kpath(structure: Structure) -> dict | None:
     '''Returns high symmetry kpoints'''
     structure = pmg_structure(structure)
     pmgKpath_obj = HighSymmKpath(structure)
     kpoints = pmgKpath_obj.kpath
     return kpoints
 
-def create_paralleliped(structure: Structure, scale: int = 1) -> list:
+def create_paralleliped(structure: Structure, scale: int = 1) -> tuple:
     '''Creates a paralleliped using the basis vectors'''
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -307,4 +311,66 @@ def plot_unit_cell(structure: Structure, scale: int = 1):
     add_kpoint_labels(structure, ax)
     #plot the unit cell
     plt.show()
+
+
+def molecule_from_file(filename: str) -> pmgMolecule:
+    '''
+    Creates a pymatgen molecule from a file
+    '''
+    molecule = pmgMolecule.from_file(filename)
+
+    return molecule
+
+
+def freeze_pmg_structure(structure: pmgStructure, min_z: float = 5.0) -> pmgStructure:
+    '''
+    Freezes all atoms below a certain z coordinate
+    '''
+    for site in structure:
+        if site.z < min_z:
+            site.properties["selective_dynamics"] = [False, False, False]
+        else:
+            site.properties["selective_dynamics"] = [True, True, True]
+
+    return structure
+
+
+def add_pmg_adsorbate(structure: Structure, adsorbate: pmgMolecule, min_z: float = 5.0, coverage: list[int] = [1, 1, 1], distance: float = 1.0) -> list[Structure]:
+    '''
+    Finds all adsorption sites on a structure and adsorbs the adsorbate at each site. Returns a list of adsorbed structures.
+    '''
+
+    asf = AdsorbateSiteFinder(structure)
+    ads_structs = asf.generate_adsorption_structures(adsorbate, repeat=coverage, find_args={"distance": distance})  # edit later
+
+    for ads_struct in ads_structs:
+        freeze_pmg_structure(ads_struct, min_z=min_z)
+
+    return ads_structs
+
+
+def slabs_from_pmgStructure(structure: Structure, miller_index: list[int], min_slab_size: float = 15.0, min_vacuum_size: float = 15.0, use_in_unit_planes: bool = False, ensure_symmetric_slabs: bool = True, min_z: int = 5, is_conventional: bool = True) -> list[Structure]:
+    '''
+    Function to generate slabs from a structure
+    '''
+
+    is_primitive = not is_conventional # pymatgen is incosistent with this
+    slab_generator = SlabGenerator(initial_structure=structure, miller_index=miller_index, min_slab_size=min_slab_size,
+                                   min_vacuum_size=min_vacuum_size, primitive=is_primitive, in_unit_planes=use_in_unit_planes)
+    slabs = slab_generator.get_slabs()
+    if ensure_symmetric_slabs:
+        slabs = [slab for slab in slabs if slab.is_symmetric()]
+
+    if len(slabs) == 0:
+        raise ValueError("No slabs generated, consider changing the slab parameters or change ensure_symmetric_slabs to False")
+
+    print(f"Generated {len(slabs)} slabs")
+
+    # freeze the bottom layer
+    for slab in slabs:
+        slab = freeze_pmg_structure(slab, min_z)
+
+    return slabs
+
+
 
