@@ -218,6 +218,16 @@ class Structure:
     def pmg_kpath(self) -> dict:
         '''Returns the high symmetry kpoints'''
         return get_high_symm_kpath(self)
+
+    @property 
+    def adjacency_matrix(self) -> np.ndarray:
+        '''Returns the adjacency matrix'''
+        #use scipy cdist to calculate the distances between all atoms
+        from scipy.spatial.distance import cdist
+        distances = cdist(self.final_positions, self.final_positions)
+        #set the diagonal to infinity
+        np.fill_diagonal(distances, np.inf)
+        return distances
         
 
 def pmg_structure(structure: Structure) -> pmgStructure:
@@ -307,4 +317,6 @@ def plot_unit_cell(structure: Structure, scale: int = 1):
     add_kpoint_labels(structure, ax)
     #plot the unit cell
     plt.show()
+
+
 

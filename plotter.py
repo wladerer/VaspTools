@@ -482,6 +482,13 @@ def plot_band_contour(electronics: ElectronicStructure, bands = list[int], title
     fig.update_layout(title=title, title_x=0.5)
 
 
+def plot_adjacency_matrix(structure: Structure):
+    '''Plots the adjacency matrix of a structure'''
+    matrix = structure.adjacency_matrix
+    fig = go.Figure(data=go.Heatmap(z=matrix))
+    fig.update_layout(title='Adjacency Matrix', title_x=0.5)
+
+    fig.show()
 
 
 
