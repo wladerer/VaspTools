@@ -3,11 +3,13 @@ from vasprunio import read_vasprun, unpack_varray
 from pathlib import Path
 import numpy as np
 import pandas as pd
-
+from mp_api.client import MPRester
+from pymatgen.analysis.adsorption import AdsorbateSiteFinder
+from pymatgen.core.structure import Molecule
+from pymatgen.core.surface import SlabGenerator
 from pymatgen.core import Structure as pmgStructure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.symmetry.bandstructure import HighSymmKpath
-import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.pyplot as plt
 
@@ -228,6 +230,11 @@ class Structure:
         #set the diagonal to infinity
         np.fill_diagonal(distances, np.inf)
         return distances
+    
+    @property
+    def pmg_structure(self) -> pmgStructure:
+        '''Returns pymatgen structure object'''
+        return pmg_structure(self)
         
 
 def pmg_structure(structure: Structure) -> pmgStructure:
@@ -318,5 +325,104 @@ def plot_unit_cell(structure: Structure, scale: int = 1):
     #plot the unit cell
     plt.show()
 
+
+def pmg_structure_from_mpi_code(mpcode: str, api_key: str, is_conventional: bool = True) -> pmgStructure:
+    '''
+    Creates a pymatgen structure from a code
+    '''
+    if not mpcode.startswith("mp-"):
+        mpcode = "mp-"+mpcode
+
+    with MPRester(api_key) as mpr:
+        structure = mpr.get_structure_by_material_id(mpcode, conventional_unit_cell=is_conventional)
+
+    return structure
+
+
+def pmg_structure_from_file(filename: str) -> pmgStructure:
+    '''
+    Creates a pymatgen structure from a file
+    '''
+    structure = pmgStructure.from_file(filename, sort=True, primitive=False)
+
+    return structure
+
+
+def pmg_molecule_from_file(filename: str) -> Molecule:
+    '''
+    Creates a pymatgen molecule from a file
+    '''
+    molecule = Molecule.from_file(filename)
+
+    return molecule
+
+
+def pmg_adsorb_structure(structure: pmgStructure, adsorbate: Molecule, min_z: float = 5.0, coverage: list[int] = [1, 1, 1], distance: float = 1.0) -> list[pmgStructure]:
+    '''
+    Finds all adsorption sites on a structure and adsorbs the adsorbate at each site. Returns a list of adsorbed structures.
+    '''
+
+    asf = AdsorbateSiteFinder(structure)
+    ads_structs = asf.generate_adsorption_structures(adsorbate, repeat=coverage, find_args={"distance": distance})  # edit later
+
+    for ads_struct in ads_structs:
+        for site in ads_struct:
+            if site.z < min_z:
+                site.properties["selective_dynamics"] = [False, False, False]
+            else:
+                site.properties["selective_dynamics"] = [True, True, True]
+
+    return ads_structs
+
+
+def slabs_from_pmg_structure(structure: pmgStructure, miller_index: list[int], min_slab_size: float = 15.0, min_vacuum_size: float = 15.0, use_in_unit_planes: bool = False, ensure_symmetric_slabs: bool = True, min_z: int = 5, is_conventional: bool = True) -> list[pmgStructure]:
+    '''
+    Function to generate slabs from a structure
+    '''
+
+    is_primitive = not is_conventional # pymatgen is incosistent with this
+    slab_generator = SlabGenerator(initial_structure=structure, miller_index=miller_index, min_slab_size=min_slab_size,
+                                   min_vacuum_size=min_vacuum_size, primitive=is_primitive, in_unit_planes=use_in_unit_planes)
+    slabs = slab_generator.get_slabs()
+    if ensure_symmetric_slabs:
+        slabs = [slab for slab in slabs if slab.is_symmetric()]
+
+    if len(slabs) == 0:
+        raise ValueError("No slabs generated, consider changing the slab parameters or change ensure_symmetric_slabs to False")
+
+    print(f"Generated {len(slabs)} slabs")
+
+    # freeze the bottom layer
+    for slab in slabs:
+        slab = freeze_structure(slab, min_z)
+
+    return slabs
+
+def freeze_structure(structure: pmgStructure, min_z: float, dof: list[bool] = [False, False, False]) -> pmgStructure:
+    '''
+    Freezes the bottom layer of a structure
+    '''
+    # if not isinstance(min_z, float) or not isinstance(min_z, int) or min_z <= 0:
+    #     raise TypeError("The min_z argument must be a positive, non-zero float or integer value.")
+    if not isinstance(dof, list) or not all(isinstance(x, bool) for x in dof) or len(dof) != 3:
+        raise TypeError("The dof argument must be a list of booleans with length 3.")
+
+    for site in structure:
+        if site.z < min_z:
+            site.properties["selective_dynamics"] = dof
+        else:
+            site.properties["selective_dynamics"] = [True, True, True]
+
+    return structure
+
+def make_slabs(structure: Structure, plane: list[int], min_slab_size: float = 15.0, min_vacuum_size: float = 15.0, use_in_unit_planes: bool = False, ensure_symmetric_slabs: bool = True, min_z: int = 5, is_conventional: bool = True) -> list[Structure]:
+    '''
+    Function to generate slabs from a structure
+    '''
+
+    pmg_stuct = structure.pmg_structure
+    slabs = slabs_from_pmg_structure(pmg_stuct, plane, min_slab_size, min_vacuum_size, use_in_unit_planes, ensure_symmetric_slabs, min_z, is_conventional)
+
+    return slabs
 
 
