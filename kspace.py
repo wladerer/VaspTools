@@ -227,7 +227,12 @@ class ElectronicStructure:
     @property
     def values(self):
         '''Mergeds projected_dos, kpoint_energies, and kpoint_positions into a single dataframe'''
-        projected_dos = self.projected_dos
+        try:
+            projected_dos = self.cprojected_dos
+        except:
+            projected_dos = self.projected_dos
+
+            
         kpoint_energies = self.kpoint_energies
         kpoint_positions = self.kpoint_coordinates
 

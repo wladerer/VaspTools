@@ -119,12 +119,12 @@ def customize_bandstructure_layout(fig):
         xaxis=dict(showline=True, linewidth=1, linecolor='black',
                    title_text=r'$\textbf{k}$'),
         yaxis=dict(showline=True, linewidth=1, linecolor='black',
-                   title_text=r'$E-E_f \quad \mbox{[eV]}$'),
+                   title_text=r'$E-E_f \quad \mbox{[eV]}$', title_standoff=0),
         showlegend=False
     )
 
 
-def plot_bandstructure(electronics: ElectronicStructure, emin: float = None,  emax=None, labels=None, show=True, legend: bool = True, fermi_energy: float = None) -> px.line:
+def plot_bandstructure(electronics: ElectronicStructure, emin: float = None,  emax=None, labels=None, show=True, legend: bool = True, fermi_energy: float = None, save: bool = False) -> px.line:
     '''Plot the bandstructure.'''
     if fermi_energy is None:
         fermi_energy = electronics.fermi_energy
@@ -145,8 +145,13 @@ def plot_bandstructure(electronics: ElectronicStructure, emin: float = None,  em
 
     customize_bandstructure_layout(fig)
 
+    #make plot 500px tall and 600px wide
+
     if show:
         fig.show()
+
+    if save:
+        fig.write_image('bandstructure.svg', width=600, height=500)
 
     return trace
 
@@ -334,7 +339,8 @@ def compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStr
 
     # add x axis as r'$k$' and y axis as r'$E-E_f$ (eV)'
     fig.update_xaxes(title_text=r'$\textbf{k}$')
-    fig.update_yaxes(title_text=r'$E-E_f \quad \mbox{[eV]}$')
+    fig.update_yaxes(title_text=r'$E-E_f \quad \mbox{[eV]}$', title_standoff=0)
+    #move y axis to the right slightly
 
     # add a horizontal line at the fermi energy
     fig.add_hline(y=0, line_width=0.5, line_color="grey")
@@ -345,6 +351,7 @@ def compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStr
     # make figure axes black lines
     fig.update_xaxes(showline=True, linewidth=1, linecolor='black')
     fig.update_yaxes(showline=True, linewidth=1, linecolor='black')
+
 
 
     divisions = electronics1.kpath_linemode_divisions
@@ -366,8 +373,7 @@ def compare_bands(electronics1: ElectronicStructure, electronics2: ElectronicStr
     if title is not None:
         # use latex for title
 
-        fig.update_layout(
-            title_text=r'$\text{'+title+'}$', title_font_size=18, title_x=0.5)
+        fig.update_layout(title_text=r'$\text{'+title+'}$', title_font_size=18, title_x=0.5)
 
     if save:
         fig.write_image(title + '.png')
@@ -453,8 +459,6 @@ def plot_isoplane(es: ElectronicStructure, isoval: float = 0.0, tolerance: float
     fig.show()
 
 
-
-
 def plot_band_contour(electronics: ElectronicStructure, bands = list[int], title: str = None):
     '''Plots the band structure as a contour plot'''
     
@@ -480,6 +484,8 @@ def plot_band_contour(electronics: ElectronicStructure, bands = list[int], title
         ), row=1, col=i+1)
 
     fig.update_layout(title=title, title_x=0.5)
+    fig.update_layout(scene_aspectmode='cube')
+    fig.show()
 
 
 def plot_adjacency_matrix(structure: Structure):
@@ -490,6 +496,22 @@ def plot_adjacency_matrix(structure: Structure):
 
     fig.show()
 
+def plot_kz_plane(electronics: ElectronicStructure, kz: float, title: str = None):
+    '''Plots the band structure in a plane of constant kz'''
+    values: pd.DataFrame = electronics.values
 
+    #get the k_points near the energy value and kz
 
+    #get the kpoints at the given kz
+    kpoints = values[values['z'] == kz]
+    
+    #z is the energy of the kpoints
+    z = kpoints['energy'].to_numpy()
 
+    #create a 2d scatter plot of the kpoints
+    fig = go.Figure(data=[go.Scatter(x=kpoints['x'], y=kpoints['y'], mode='markers', marker=dict(color=z, colorscale='inferno', showscale=True, size=5))])
+    
+
+    fig.update_layout(title=title, title_x=0.5)
+    fig.update_layout(scene_aspectmode='cube')
+    fig.show()

@@ -106,7 +106,7 @@ class Structure:
 
     @property
     def final_reciprocal_basis(self) -> np.ndarray:
-        final_reciprocal_basis_varray = self.final_stucture_element.find(
+        final_reciprocal_basis_varray = self._final_stucture_element.find(
             'varray[@name="rec_basis"]')
         final_reciprocal_basis = unpack_varray(final_reciprocal_basis_varray)
 

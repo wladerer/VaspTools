@@ -12,7 +12,6 @@ def read_vasprun(xml_file_path: str | Path, debug = False) -> ET.Element:
 
     return root
         
-
 def unpack_varray(varray: ET.Element) -> np.ndarray:
     """Unpacks a rarray element into a numpy array"""
     v_strings = (r.text for r in varray.findall('v'))
